@@ -14,7 +14,10 @@ interface InventoryItem {
   createdAt: any;
 }
 
-export default function InventoryScreen() {
+export default function InventoryScreen({ route }: any) {
+  const { role, teamName } = route?.params || { role: 'admin', teamName: null };
+  const isAdmin = role === 'admin';
+
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [teams, setTeams] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -155,53 +158,55 @@ export default function InventoryScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Formulario de Alta / Edición */}
-      <View style={styles.formCard}>
-        <Text style={styles.formTitle}>{editingId ? '✏️ Editar Artículo' : 'Añadir Nuevo Artículo'}</Text>
-        <View style={styles.formRow}>
-          <TextInput
-            style={[styles.input, { flex: 1 }]}
-            placeholder="Nombre (ej. Limpiacristales 5L)"
-            value={name}
-            onChangeText={setName}
-          />
-          {activeTab !== 'maquinaria' && (
+      {/* Formulario de Alta / Edición (Solo Admin) */}
+      {isAdmin && (
+        <View style={styles.formCard}>
+          <Text style={styles.formTitle}>{editingId ? '✏️ Editar Artículo' : 'Añadir Nuevo Artículo'}</Text>
+          <View style={styles.formRow}>
             <TextInput
-              style={[styles.input, { width: 90 }]}
-              placeholder="Alerta en..."
-              keyboardType="numeric"
-              value={minStock}
-              onChangeText={setMinStock}
+              style={[styles.input, { flex: 1 }]}
+              placeholder="Nombre (ej. Limpiacristales 5L)"
+              value={name}
+              onChangeText={setName}
             />
-          )}
-        </View>
+            {activeTab !== 'maquinaria' && (
+              <TextInput
+                style={[styles.input, { width: 90 }]}
+                placeholder="Alerta en..."
+                keyboardType="numeric"
+                value={minStock}
+                onChangeText={setMinStock}
+              />
+            )}
+          </View>
 
-        <Text style={styles.label}>Asignar a Equipo (opcional):</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.teamScrollRow}>
-          {['Oficina/General', ...teams.map(t => t.name)].map((tName) => (
-            <TouchableOpacity
-              key={tName}
-              style={[styles.teamChip, selectedTeam === tName && styles.teamChipActive]}
-              onPress={() => setSelectedTeam(tName)}
-            >
-              <Text style={selectedTeam === tName ? styles.teamChipTextActive : styles.teamChipTextInactive}>
-                {tName === 'Oficina/General' ? '🏢 General' : `🚐 ${tName}`}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
+          <Text style={styles.label}>Asignar a Equipo (opcional):</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.teamScrollRow}>
+            {['Oficina/General', ...teams.map(t => t.name)].map((tName) => (
+              <TouchableOpacity
+                key={tName}
+                style={[styles.teamChip, selectedTeam === tName && styles.teamChipActive]}
+                onPress={() => setSelectedTeam(tName)}
+              >
+                <Text style={selectedTeam === tName ? styles.teamChipTextActive : styles.teamChipTextInactive}>
+                  {tName === 'Oficina/General' ? '🏢 General' : `🚐 ${tName}`}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
 
-        <View style={{ flexDirection: 'row', gap: 10 }}>
-          <TouchableOpacity style={[styles.buttonAdd, { flex: 1 }]} onPress={saveItem}>
-            <Text style={styles.buttonText}>{editingId ? 'Guardar Cambios' : `+ Registrar en ${activeTab}`}</Text>
-          </TouchableOpacity>
-          {editingId && (
-            <TouchableOpacity style={[styles.buttonAdd, { flex: 1, backgroundColor: '#888' }]} onPress={cancelEdit}>
-              <Text style={styles.buttonText}>Cancelar</Text>
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            <TouchableOpacity style={[styles.buttonAdd, { flex: 1 }]} onPress={saveItem}>
+              <Text style={styles.buttonText}>{editingId ? 'Guardar Cambios' : `+ Registrar en ${activeTab}`}</Text>
             </TouchableOpacity>
-          )}
+            {editingId && (
+              <TouchableOpacity style={[styles.buttonAdd, { flex: 1, backgroundColor: '#888' }]} onPress={cancelEdit}>
+                <Text style={styles.buttonText}>Cancelar</Text>
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
-      </View>
+      )}
 
       {/* Lista de Inventario */}
       {loading ? (
@@ -223,7 +228,7 @@ export default function InventoryScreen() {
                   ) : (
                     <Text style={[styles.itemStat, isAlert && {color: '#d9534f', fontWeight: 'bold'}]}>
                       Stock actual: <Text style={{fontWeight:'bold'}}>{item.stock || 0} u.</Text>
-                      <Text style={{fontSize: 10, color: '#999', fontWeight: 'normal'}}> (Avisa en {item.minStockAlert ?? 2})</Text>
+                      {isAdmin && <Text style={{fontSize: 10, color: '#999', fontWeight: 'normal'}}> (Avisa en {item.minStockAlert ?? 2})</Text>}
                     </Text>
                   )}
                 </View>
@@ -238,17 +243,23 @@ export default function InventoryScreen() {
                       <TouchableOpacity style={styles.actionBtnRed} onPress={() => adjustStock(item.id, -1)}>
                         <Text style={styles.actionBtnText}>- 1 Gasto</Text>
                       </TouchableOpacity>
-                      <TouchableOpacity style={styles.actionBtnGreen} onPress={() => adjustStock(item.id, 1)}>
-                        <Text style={styles.actionBtnText}>+ Stock</Text>
+                      {isAdmin && (
+                        <TouchableOpacity style={styles.actionBtnGreen} onPress={() => adjustStock(item.id, 1)}>
+                          <Text style={styles.actionBtnText}>+ Stock</Text>
+                        </TouchableOpacity>
+                      )}
+                    </>
+                  )}
+                  {isAdmin && (
+                    <>
+                      <TouchableOpacity style={styles.iconBtn} onPress={() => handleEdit(item)}>
+                        <Text style={{fontSize: 16}}>✏️</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity style={styles.iconBtn} onPress={() => deleteItem(item.id, item.name)}>
+                        <Text style={{fontSize: 16}}>🗑️</Text>
                       </TouchableOpacity>
                     </>
                   )}
-                  <TouchableOpacity style={styles.iconBtn} onPress={() => handleEdit(item)}>
-                    <Text style={{fontSize: 16}}>✏️</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.iconBtn} onPress={() => deleteItem(item.id, item.name)}>
-                    <Text style={{fontSize: 16}}>🗑️</Text>
-                  </TouchableOpacity>
                 </View>
               </View>
             );

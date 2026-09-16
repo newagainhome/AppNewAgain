@@ -1,5 +1,7 @@
 import React from 'react';
 import { Image, View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
+import RoleSelectionScreen from '../screens/RoleSelectionScreen';
+import { useAppContext } from '../context/AppContext';
 import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { NavigationContainer } from '@react-navigation/native';
@@ -84,32 +86,54 @@ function CustomTopTabBar({ state, descriptors, navigation }: any) {
   );
 }
 
+// ... (keep CustomTopTabBar and styles intact)
+
 function TopTabs() {
+  const { role, teamName } = useAppContext();
+
   return (
     <Tab.Navigator tabBar={(props) => <CustomTopTabBar {...props} />}>
-      <Tab.Screen name="Dashboard" component={DashboardScreen} options={{ tabBarLabel: '📊 Dashboard' }} />
-      <Tab.Screen name="Calendar" component={CalendarScreen} options={{ tabBarLabel: '📅 Calendario' }} />
-      <Tab.Screen name="Route" component={RouteScreen} options={{ tabBarLabel: '🗺️ Rutas' }} />
-      <Tab.Screen name="Appointments" component={AppointmentsScreen} options={{ tabBarLabel: '➕ Nueva Cita' }} />
-      <Tab.Screen name="Clients" component={ClientsScreen} options={{ tabBarLabel: '👥 Clientes' }} />
-      <Tab.Screen name="Services" component={ServicesScreen} options={{ tabBarLabel: '🧹 Servicios' }} />
-      <Tab.Screen name="Expenses" component={ExpensesScreen} options={{ tabBarLabel: '💸 Gastos' }} />
-      <Tab.Screen name="Inventory" component={InventoryScreen} options={{ tabBarLabel: '📦 Inventario' }} />
+      {role === 'admin' && <Tab.Screen name="Dashboard" component={DashboardScreen} options={{ tabBarLabel: '📊 Dashboard' }} />}
+      
+      <Tab.Screen name="Calendar" component={CalendarScreen} options={{ tabBarLabel: '📅 Calendario' }} initialParams={{ role, teamName }} />
+      <Tab.Screen name="Route" component={RouteScreen} options={{ tabBarLabel: '🗺️ Rutas' }} initialParams={{ role, teamName }} />
+      <Tab.Screen name="Appointments" component={AppointmentsScreen} options={{ tabBarLabel: '➕ Nueva Cita' }} initialParams={{ role, teamName }} />
+      
+      {role === 'admin' && <Tab.Screen name="Clients" component={ClientsScreen} options={{ tabBarLabel: '👥 Clientes' }} />}
+      {role === 'admin' && <Tab.Screen name="Services" component={ServicesScreen} options={{ tabBarLabel: '🧹 Servicios' }} />}
+      {role === 'admin' && <Tab.Screen name="Expenses" component={ExpensesScreen} options={{ tabBarLabel: '💸 Gastos' }} />}
+      
+      <Tab.Screen name="Inventory" component={InventoryScreen} options={{ tabBarLabel: '📦 Inventario' }} initialParams={{ role, teamName }} />
     </Tab.Navigator>
   );
 }
 
 export default function AppNavigator() {
+  const { role, logout } = useAppContext();
+
   return (
     <NavigationContainer>
       <Stack.Navigator
         screenOptions={{
           headerStyle: { backgroundColor: '#002a54' },
           headerTitleAlign: 'center',
-          headerTitle: () => <LogoTitle />
+          headerTitle: () => (
+            <View style={{flexDirection: 'row', alignItems: 'center'}}>
+              <LogoTitle />
+            </View>
+          ),
+          headerRight: () => role ? (
+            <TouchableOpacity onPress={logout} style={{marginRight: 15, padding: 5}}>
+              <Text style={{color: '#fff', fontWeight: 'bold'}}>Salir 🔒</Text>
+            </TouchableOpacity>
+          ) : null
         }}
       >
-        <Stack.Screen name="Main" component={TopTabs} />
+        {!role ? (
+          <Stack.Screen name="Login" component={RoleSelectionScreen} options={{ headerShown: false }} />
+        ) : (
+          <Stack.Screen name="Main" component={TopTabs} />
+        )}
       </Stack.Navigator>
     </NavigationContainer>
   );

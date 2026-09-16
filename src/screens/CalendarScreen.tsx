@@ -48,10 +48,16 @@ interface Team {
   vehicle?: string;
 }
 
-export default function CalendarScreen({ navigation }: any) {
+export default function CalendarScreen({ route, navigation }: any) {
+  const { role, teamName } = route?.params || { role: 'admin', teamName: null };
+  const isAdmin = role === 'admin';
+
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
-  const [teams, setTeams] = useState<Team[]>([]);
+  const [teams, setTeams] = useState<any[]>([]);
+  
+  // Set default team to logged-in team if not admin
+  const [filterTeam, setFilterTeam] = useState<string | null>(isAdmin ? null : teamName);
   const [conflicts, setConflicts] = useState<Record<string, string>>({});
   
   // Recordatorios y Fotos
@@ -656,9 +662,11 @@ export default function CalendarScreen({ navigation }: any) {
         </TouchableOpacity>
         
         <View style={styles.topActions}>
-          <TouchableOpacity style={styles.manageTeamsBtn} onPress={() => setShowTeamsModal(true)}>
-            <Text style={styles.manageTeamsText}>👥 Equipos ({teams.length})</Text>
-          </TouchableOpacity>
+          {isAdmin && (
+            <TouchableOpacity style={styles.manageTeamsBtn} onPress={() => setShowTeamsModal(true)}>
+              <Text style={styles.manageTeamsText}>👥 Equipos ({teams.length})</Text>
+            </TouchableOpacity>
+          )}
           <TouchableOpacity style={styles.newApptBtn} onPress={() => navigation.navigate('Appointments')}>
             <Text style={styles.newApptText}>+ Cita</Text>
           </TouchableOpacity>
@@ -695,7 +703,7 @@ export default function CalendarScreen({ navigation }: any) {
 
       {/* VISTA EN COLUMNAS POR CADA EQUIPO DISPONIBLE */}
       <ScrollView horizontal showsHorizontalScrollIndicator={true} style={styles.columnsScrollView}>
-        {teams.map((t) => {
+        {teams.filter(t => isAdmin || t.name === teamName).map((t) => {
           const teamApps = appointments.filter(
             (a) => (a.team || teams[0]?.name || 'Equipo 1') === t.name
           );
@@ -863,12 +871,14 @@ export default function CalendarScreen({ navigation }: any) {
                 </View>
 
                 {/* BOTÓN FACTURA PDF */}
-                <TouchableOpacity 
-                  style={styles.invoiceBtn} 
-                  onPress={() => generateInvoice(selectedAppointment)}
-                >
-                  <Text style={styles.invoiceBtnText}>📄 Generar Factura (PDF)</Text>
-                </TouchableOpacity>
+                {isAdmin && (
+                  <TouchableOpacity 
+                    style={styles.invoiceBtn} 
+                    onPress={() => generateInvoice(selectedAppointment)}
+                  >
+                    <Text style={styles.invoiceBtnText}>📄 Generar Factura (PDF)</Text>
+                  </TouchableOpacity>
+                )}
 
                 {selectedAppointment.phone ? (
                   <TouchableOpacity 
