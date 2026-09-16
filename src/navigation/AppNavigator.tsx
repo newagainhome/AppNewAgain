@@ -8,6 +8,7 @@ import AppointmentsScreen from '../screens/AppointmentsScreen';
 import ServicesScreen from '../screens/ServicesScreen';
 import RouteScreen from '../screens/RouteScreen';
 import ClientsScreen from '../screens/ClientsScreen';
+import DashboardScreen from '../screens/DashboardScreen';
 
 const Tab = createMaterialTopTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -78,6 +79,7 @@ function CustomTopTabBar({ state, descriptors, navigation }: any) {
 function TopTabs() {
   return (
     <Tab.Navigator tabBar={(props) => <CustomTopTabBar {...props} />}>
+      <Tab.Screen name="Dashboard" component={DashboardScreen} options={{ tabBarLabel: 'Dashboard' }} />
       <Tab.Screen name="Calendar" component={CalendarScreen} options={{ tabBarLabel: 'Calendario' }} />
       <Tab.Screen name="Route" component={RouteScreen} options={{ tabBarLabel: 'Rutas' }} />
       <Tab.Screen name="Appointments" component={AppointmentsScreen} options={{ tabBarLabel: 'Nueva Cita' }} />
@@ -135,7 +137,7 @@ const styles = StyleSheet.create({
   tabText: {
     color: '#002a54',
     fontWeight: 'bold',
-    fontSize: 14,
+    fontSize: 13,
     textAlign: 'center'
   },
   tabTextActive: {
