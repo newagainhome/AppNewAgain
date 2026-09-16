@@ -36,6 +36,12 @@ export default function ExpensesScreen() {
     return () => unsubscribe();
   }, []);
 
+  const handleImageResult = (result: ImagePicker.ImagePickerResult) => {
+    if (!result.canceled && result.assets && result.assets.length > 0) {
+      setTicketImage(result.assets[0].uri);
+    }
+  };
+
   const pickImage = async () => {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
@@ -43,12 +49,21 @@ export default function ExpensesScreen() {
         allowsEditing: true,
         quality: 0.3,
       });
-
-      if (!result.canceled && result.assets && result.assets.length > 0) {
-        setTicketImage(result.assets[0].uri);
-      }
+      handleImageResult(result);
     } catch (error) {
       alert('Error al seleccionar la imagen.');
+    }
+  };
+
+  const takePhoto = async () => {
+    try {
+      const result = await ImagePicker.launchCameraAsync({
+        allowsEditing: true,
+        quality: 0.3,
+      });
+      handleImageResult(result);
+    } catch (error) {
+      alert('Error al abrir la cámara.');
     }
   };
 
@@ -127,15 +142,21 @@ export default function ExpensesScreen() {
           value={date}
           onChangeText={setDate}
         />
-        <TouchableOpacity style={styles.photoBtn} onPress={pickImage}>
-          <Text style={styles.photoBtnText}>
-            {ticketImage ? '📸 Ticket Listo ✓' : '📸 Adjuntar Ticket'}
-          </Text>
-        </TouchableOpacity>
+        <View style={{ flex: 1.5, flexDirection: 'row', gap: 6 }}>
+          <TouchableOpacity style={styles.photoBtnSmall} onPress={takePhoto}>
+            <Text style={styles.photoBtnText}>📷 Cámara</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.photoBtnSmall} onPress={pickImage}>
+            <Text style={styles.photoBtnText}>📁 Galería</Text>
+          </TouchableOpacity>
+        </View>
       </View>
       
       {ticketImage && (
-        <Image source={{ uri: ticketImage }} style={styles.previewImg} />
+        <View style={{ alignItems: 'center', marginBottom: 15 }}>
+          <Text style={{ color: '#4a9b40', fontWeight: 'bold', marginBottom: 4 }}>✓ Ticket adjuntado correctamente</Text>
+          <Image source={{ uri: ticketImage }} style={styles.previewImg} />
+        </View>
       )}
 
       <TouchableOpacity
@@ -192,9 +213,9 @@ const styles = StyleSheet.create({
   titleList: { fontSize: 18, fontWeight: 'bold', marginTop: 25, marginBottom: 15, color: '#d9534f' },
   formRow: { flexDirection: 'row', gap: 10, marginBottom: 10 },
   input: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#ddd', padding: 12, borderRadius: 8, fontSize: 15 },
-  photoBtn: { flex: 1, backgroundColor: '#f0f4f8', borderWidth: 1, borderColor: '#dbe2ea', padding: 12, borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
-  photoBtnText: { color: '#002a54', fontWeight: 'bold' },
-  previewImg: { width: 100, height: 100, borderRadius: 8, alignSelf: 'center', marginBottom: 15 },
+  photoBtnSmall: { flex: 1, backgroundColor: '#f0f4f8', borderWidth: 1, borderColor: '#dbe2ea', paddingVertical: 12, paddingHorizontal: 5, borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
+  photoBtnText: { color: '#002a54', fontWeight: 'bold', fontSize: 13 },
+  previewImg: { width: 100, height: 100, borderRadius: 8, alignSelf: 'center', marginBottom: 5 },
   buttonAdd: { backgroundColor: '#d9534f', padding: 14, borderRadius: 8, alignItems: 'center' },
   buttonText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
   expenseCard: { backgroundColor: '#fff', padding: 15, borderRadius: 8, marginBottom: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderLeftWidth: 4, borderLeftColor: '#d9534f', elevation: 1 },
