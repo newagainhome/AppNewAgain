@@ -103,6 +103,9 @@ export default function RouteScreen() {
                 <View style={styles.routeInfo}>
                   <Text style={styles.time}>{item.time} - {item.client}</Text>
                   <Text style={styles.address}>📍 {item.address || 'Sin dirección'}</Text>
+                  {item.detailedInfo ? (
+                    <Text style={styles.detailedInfo}>🏢 {item.detailedInfo}</Text>
+                  ) : null}
                   <Text style={styles.teamBadgeText}>🚐 {item.team || 'Equipo 1'}</Text>
                 </View>
               </View>
@@ -143,7 +146,8 @@ const styles = StyleSheet.create({
   numberText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
   routeInfo: { flex: 1 },
   time: { fontWeight: 'bold', color: '#002a54', fontSize: 16, marginBottom: 4 },
-  address: { color: '#666', fontSize: 14, marginBottom: 4 },
+  address: { color: '#444', fontSize: 14, marginBottom: 2 },
+  detailedInfo: { color: '#8a5800', fontWeight: 'bold', fontSize: 12, marginBottom: 4, backgroundColor: '#fff8e7', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, alignSelf: 'flex-start' },
   teamBadgeText: { color: '#4a9b40', fontWeight: 'bold', fontSize: 12 },
 
   mapButton: { backgroundColor: '#4a9b40', padding: 15, borderRadius: 8, alignItems: 'center', marginTop: 10, marginBottom: 20 },

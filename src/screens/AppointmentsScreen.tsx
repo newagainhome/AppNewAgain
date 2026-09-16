@@ -18,11 +18,15 @@ export default function AppointmentsScreen({ navigation }: any) {
   const [client, setClient] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [time, setTime] = useState('');
-  const [address, setAddress] = useState('');
-  const [validatedAddress, setValidatedAddress] = useState<string | null>(null);
-  const [addressSuggestions, setAddressSuggestions] = useState<any[]>([]);
-  const [isValidatingAddress, setIsValidatingAddress] = useState(false);
   
+  // Dirección y validación estricta
+  const [addressInput, setAddressInput] = useState('');
+  const [validatedAddress, setValidatedAddress] = useState<string | null>(null);
+  const [detailedInfo, setDetailedInfo] = useState('');
+  const [addressSuggestions, setAddressSuggestions] = useState<any[]>([]);
+  const [isValidating, setIsValidating] = useState(false);
+  const [isValidated, setIsValidated] = useState(false);
+
   const [price, setPrice] = useState('');
   const [team, setTeam] = useState('Equipo 1');
   const [teams, setTeams] = useState<any[]>([]);
@@ -70,19 +74,20 @@ export default function AppointmentsScreen({ navigation }: any) {
     return () => unsubscribe();
   }, [date]);
 
-  // VALIDACIÓN DE DIRECCIÓN CON SERVICIO OFICIAL DE MAPAS Y GEOCODIFICACIÓN
-  const searchAddressValidation = async (queryText: string) => {
-    setAddress(queryText);
+  // BÚSQUEDA AUTOMÁTICA Y PRECISA DE DIRECCIONES
+  const searchAddress = async (text: string) => {
+    setAddressInput(text);
+    setIsValidated(false);
     setValidatedAddress(null);
-    if (!queryText || queryText.trim().length < 4) {
+
+    if (!text || text.trim().length < 3) {
       setAddressSuggestions([]);
       return;
     }
 
-    setIsValidatingAddress(true);
+    setIsValidating(true);
     try {
-      // Servicio geográfico con municipios y normalización
-      const url = `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=4&countrycodes=es&q=${encodeURIComponent(queryText)}`;
+      const url = `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=5&countrycodes=es&q=${encodeURIComponent(text)}`;
       const response = await fetch(url, {
         headers: {
           'Accept': 'application/json',
@@ -90,44 +95,43 @@ export default function AppointmentsScreen({ navigation }: any) {
         }
       });
       const data = await response.json();
-      
       if (Array.isArray(data)) {
         setAddressSuggestions(data);
       } else {
         setAddressSuggestions([]);
       }
     } catch (error) {
-      console.log('Error validando dirección:', error);
+      console.log('Error buscando dirección:', error);
     } finally {
-      setIsValidatingAddress(false);
+      setIsValidating(false);
     }
   };
 
-  const selectSuggestedAddress = (item: any) => {
+  const selectAddress = (item: any) => {
     const addr = item.address || {};
-    const road = addr.road || addr.pedestrian || addr.street || item.name || '';
-    const houseNumber = addr.house_number ? ` ${addr.house_number}` : '';
+    const road = addr.road || addr.pedestrian || addr.street || addr.neighbourhood || item.name || '';
+    const houseNumber = addr.house_number ? `, ${addr.house_number}` : '';
     const municipality = addr.city || addr.town || addr.village || addr.municipality || addr.county || '';
     const postcode = addr.postcode ? ` (${addr.postcode})` : '';
     const province = addr.province || addr.state || '';
 
-    // Formatear dirección limpia y normalizada con su municipio oficial
     let formatted = `${road}${houseNumber}`.trim();
-    if (municipality) formatted += `, ${municipality}${postcode}`;
-    if (province && province !== municipality) formatted += `, ${province}`;
+    if (municipality) formatted += ` · ${municipality}${postcode}`;
+    if (province && province !== municipality) formatted += ` · ${province}`;
     if (!formatted) formatted = item.display_name;
 
-    setAddress(formatted);
+    setAddressInput(formatted);
     setValidatedAddress(formatted);
+    setIsValidated(true);
     setAddressSuggestions([]);
   };
 
   const verifyInGoogleMaps = () => {
-    if (!address.trim()) {
-      alert('Escribe primero una dirección para verificarla en Google Maps.');
+    if (!addressInput.trim()) {
+      alert('Escribe una dirección primero.');
       return;
     }
-    Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`);
+    Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addressInput)}`);
   };
 
   const handleSelectService = (srv: any) => {
@@ -164,8 +168,8 @@ export default function AppointmentsScreen({ navigation }: any) {
   };
 
   const findOptimalSlot = async () => {
-    if (!address || address.length < 4 || !selectedService) {
-      Alert.alert("Aviso", "Escribe una dirección y selecciona un servicio para buscar la ruta óptima.");
+    if (!isValidated || !addressInput || !selectedService) {
+      Alert.alert("Aviso", "Primero selecciona y valida una dirección oficial de la lista y elige un servicio.");
       return;
     }
 
@@ -197,7 +201,7 @@ export default function AppointmentsScreen({ navigation }: any) {
       let maxSim = 0;
 
       for (const app of appsInRange) {
-        const sim = getSimilarity(address, app.address);
+        const sim = getSimilarity(addressInput, app.address);
         if (sim > maxSim) {
           maxSim = sim;
           bestMatchApp = app;
@@ -231,29 +235,47 @@ export default function AppointmentsScreen({ navigation }: any) {
   };
 
   const saveAppointment = async () => {
-    if (!client || !date || !time || !selectedService) {
-      alert("Faltan datos obligatorios (cliente, servicio, fecha y hora).");
+    if (!client.trim() || !date || !time || !selectedService) {
+      alert("Por favor, rellena todos los campos obligatorios (cliente, servicio, fecha y hora).");
       return;
     }
+
+    if (!isValidated || !validatedAddress) {
+      alert("⚠️ Debes seleccionar una dirección validada del menú de sugerencias para asegurar la calle, el número y el municipio correctos.");
+      return;
+    }
+
     const status = checkSlotStatus(time);
     if (status.conflict) {
       alert(status.reason);
       return;
     }
+
     try {
       const finalTeam = team || (teams[0]?.name ?? 'Equipo 1');
       await addDoc(collection(db, 'appointments'), {
         client: client.trim(),
         date,
         time,
-        address: address.trim(),
+        address: validatedAddress,
+        detailedInfo: detailedInfo.trim(),
         price: price.trim() || '',
         team: finalTeam,
         serviceName: selectedService.name,
         duration: selectedService.duration,
         createdAt: new Date()
       });
-      setClient(''); setTime(''); setAddress(''); setPrice(''); setValidatedAddress(null); setSelectedService(null); setSmartSuggestion(null);
+
+      // Resetear estado
+      setClient('');
+      setTime('');
+      setAddressInput('');
+      setValidatedAddress(null);
+      setDetailedInfo('');
+      setIsValidated(false);
+      setPrice('');
+      setSelectedService(null);
+      setSmartSuggestion(null);
       navigation.navigate('Calendar');
     } catch (error) {
       alert("Error al guardar la cita.");
@@ -281,39 +303,44 @@ export default function AppointmentsScreen({ navigation }: any) {
         onChangeText={setClient}
       />
       
-      {/* SECCIÓN DE DIRECCIÓN CON VALIDACIÓN Y MAPAS */}
+      {/* SECCIÓN DE DIRECCIÓN VALIDADA OBLIGATORIA */}
       <View style={styles.addressSection}>
+        <Text style={styles.inputLabel}>Dirección (Calle, Número y Municipio): *</Text>
         <View style={styles.addressInputRow}>
           <TextInput
-            style={[styles.input, { flex: 1, marginBottom: 0 }]}
-            placeholder="Dirección y Municipio (ej. Calle Mayor 10, Pozuelo)"
-            value={address}
-            onChangeText={searchAddressValidation}
+            style={[
+              styles.input,
+              { flex: 1, marginBottom: 0 },
+              isValidated && styles.inputValidated
+            ]}
+            placeholder="Ej: Calle la del Manojo de Rosas, 87, Madrid"
+            value={addressInput}
+            onChangeText={searchAddress}
           />
           <TouchableOpacity style={styles.mapsVerifyBtn} onPress={verifyInGoogleMaps}>
             <Text style={styles.mapsVerifyText}>🗺️ Ver Mapa</Text>
           </TouchableOpacity>
         </View>
 
-        {isValidatingAddress && (
+        {isValidating && (
           <View style={styles.validatingRow}>
             <ActivityIndicator size="small" color="#002a54" />
-            <Text style={styles.validatingText}>Buscando dirección y municipio oficial...</Text>
+            <Text style={styles.validatingText}>Validando dirección con mapas oficiales...</Text>
           </View>
         )}
 
-        {/* Sugerencias de municipios y direcciones normalizadas */}
+        {/* Listado de sugerencias oficiales verificadas */}
         {addressSuggestions.length > 0 && (
           <View style={styles.suggestionsCard}>
-            <Text style={styles.suggestionsHeader}>📍 Selecciona la dirección exacta verificada:</Text>
+            <Text style={styles.suggestionsHeader}>📍 Toca una dirección oficial para validarla:</Text>
             {addressSuggestions.map((item, idx) => (
               <TouchableOpacity
                 key={idx}
                 style={styles.suggestionItem}
-                onPress={() => selectSuggestedAddress(item)}
+                onPress={() => selectAddress(item)}
               >
                 <Text style={styles.suggestionItemTitle}>
-                  {item.address?.road || item.name || 'Calle'}{item.address?.house_number ? ` ${item.address.house_number}` : ''}
+                  {item.address?.road || item.name || 'Calle'}{item.address?.house_number ? `, ${item.address.house_number}` : ''}
                 </Text>
                 <Text style={styles.suggestionItemSubtitle}>
                   🏛️ {item.address?.city || item.address?.town || item.address?.village || item.address?.municipality || 'Municipio'} {item.address?.postcode ? `(${item.address.postcode})` : ''} · {item.address?.province || item.address?.state || ''}
@@ -323,20 +350,40 @@ export default function AppointmentsScreen({ navigation }: any) {
           </View>
         )}
 
-        {validatedAddress && (
+        {isValidated ? (
           <View style={styles.validatedBadge}>
-            <Text style={styles.validatedBadgeText}>✅ Dirección y Municipio Validados: {validatedAddress}</Text>
+            <Text style={styles.validatedBadgeText}>✅ Dirección Oficial Validada: {validatedAddress}</Text>
           </View>
+        ) : (
+          addressInput.trim().length > 3 && addressSuggestions.length === 0 && !isValidating && (
+            <Text style={styles.unvalidatedWarning}>
+              ⚠️ Selecciona una de las direcciones oficiales que aparecen al escribir para asegurar el municipio y número.
+            </Text>
+          )
         )}
       </View>
 
-      <TextInput
-        style={styles.input}
-        placeholder="Presupuesto acordado (€) (opcional)"
-        keyboardType="numeric"
-        value={price}
-        onChangeText={setPrice}
-      />
+      {/* NUEVO CAMPO: INFORMACIÓN DETALLADA */}
+      <View style={{ marginBottom: 12 }}>
+        <Text style={styles.inputLabel}>Información detallada (Portal, Escalera, Piso, Puerta):</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Ej: Portal 3, Escalera B, 2º Izquierda, Timbre Pérez"
+          value={detailedInfo}
+          onChangeText={setDetailedInfo}
+        />
+      </View>
+
+      <View style={{ marginBottom: 12 }}>
+        <Text style={styles.inputLabel}>Presupuesto acordado (€) (opcional):</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Ej: 95"
+          keyboardType="numeric"
+          value={price}
+          onChangeText={setPrice}
+        />
+      </View>
 
       <Text style={styles.subtitle}>1. Servicio:</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.scrollRow}>
@@ -428,22 +475,25 @@ const styles = StyleSheet.create({
   container: { flex: 1, padding: 20, backgroundColor: '#f9f9f9' },
   title: { fontSize: 22, fontWeight: 'bold', marginBottom: 15, color: '#002a54' },
   subtitle: { fontSize: 16, fontWeight: 'bold', marginTop: 10, marginBottom: 10, color: '#002a54' },
-  input: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#ddd', padding: 12, borderRadius: 8, marginBottom: 10, fontSize: 15 },
+  inputLabel: { fontSize: 13, fontWeight: 'bold', color: '#002a54', marginBottom: 4 },
+  input: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#ddd', padding: 12, borderRadius: 8, fontSize: 15 },
+  inputValidated: { borderColor: '#4a9b40', borderWidth: 2, backgroundColor: '#fafffa' },
   
-  // Estilos de validación de dirección
-  addressSection: { marginBottom: 10 },
+  // Validación de Dirección
+  addressSection: { marginBottom: 12 },
   addressInputRow: { flexDirection: 'row', gap: 8, alignItems: 'center', marginBottom: 6 },
   mapsVerifyBtn: { backgroundColor: '#eef4fa', borderWidth: 1, borderColor: '#002a54', paddingHorizontal: 12, paddingVertical: 12, borderRadius: 8, justifyContent: 'center' },
   mapsVerifyText: { color: '#002a54', fontWeight: 'bold', fontSize: 13 },
   validatingRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginVertical: 4 },
   validatingText: { color: '#666', fontSize: 12, fontStyle: 'italic' },
-  suggestionsCard: { backgroundColor: '#ffffff', borderRadius: 8, borderWidth: 1, borderColor: '#cfe0f2', marginTop: 4, elevation: 3, shadowOpacity: 0.1 },
+  suggestionsCard: { backgroundColor: '#ffffff', borderRadius: 8, borderWidth: 1, borderColor: '#cfe0f2', marginTop: 4, elevation: 4, shadowOpacity: 0.15 },
   suggestionsHeader: { backgroundColor: '#f0f6fc', paddingHorizontal: 12, paddingVertical: 8, fontWeight: 'bold', color: '#002a54', fontSize: 12, borderTopLeftRadius: 7, borderTopRightRadius: 7 },
-  suggestionItem: { padding: 10, borderBottomWidth: 1, borderBottomColor: '#eee' },
+  suggestionItem: { padding: 12, borderBottomWidth: 1, borderBottomColor: '#eee' },
   suggestionItemTitle: { fontWeight: 'bold', color: '#002a54', fontSize: 14 },
   suggestionItemSubtitle: { color: '#555', fontSize: 12, marginTop: 2 },
   validatedBadge: { backgroundColor: '#eaf5ea', borderWidth: 1, borderColor: '#a3d9a3', padding: 8, borderRadius: 6, marginTop: 4 },
   validatedBadgeText: { color: '#256320', fontWeight: 'bold', fontSize: 12 },
+  unvalidatedWarning: { color: '#c0392b', fontSize: 12, marginTop: 4, fontStyle: 'italic' },
 
   smartButton: { backgroundColor: '#002a54', padding: 12, borderRadius: 8, alignItems: 'center', marginBottom: 15 },
   smartButtonText: { color: '#fff', fontWeight: 'bold', fontSize: 15 },

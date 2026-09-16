@@ -22,6 +22,7 @@ interface Appointment {
   duration: string;
   price?: string;
   address?: string;
+  detailedInfo?: string;
   team?: string;
 }
 
@@ -313,9 +314,16 @@ export default function CalendarScreen({ navigation }: any) {
                     )}
 
                     {item.address ? (
-                      <TouchableOpacity style={styles.mapButton} onPress={() => openMaps(item.address)}>
-                        <Text style={styles.mapButtonText} numberOfLines={1}>📍 {item.address}</Text>
-                      </TouchableOpacity>
+                      <View style={{ marginTop: 4 }}>
+                        <TouchableOpacity style={styles.mapButton} onPress={() => openMaps(item.address)}>
+                          <Text style={styles.mapButtonText} numberOfLines={2}>📍 {item.address}</Text>
+                        </TouchableOpacity>
+                        {item.detailedInfo ? (
+                          <View style={styles.detailedInfoBox}>
+                            <Text style={styles.detailedInfoText}>🏢 {item.detailedInfo}</Text>
+                          </View>
+                        ) : null}
+                      </View>
                     ) : null}
                   </View>
                 ))}
@@ -546,11 +554,20 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 10,
     borderRadius: 6,
-    alignItems: 'center',
     borderWidth: 1,
     borderColor: '#d0d7de'
   },
   mapButtonText: { color: '#002a54', fontWeight: 'bold', fontSize: 13 },
+  detailedInfoBox: {
+    backgroundColor: '#fff8e7',
+    borderWidth: 1,
+    borderColor: '#fae4b2',
+    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    marginTop: 6
+  },
+  detailedInfoText: { color: '#8a5800', fontWeight: 'bold', fontSize: 12 },
   emptyColumnBox: { paddingVertical: 30, alignItems: 'center' },
   emptyColumnText: { color: '#999', fontStyle: 'italic', fontSize: 14 },
   
