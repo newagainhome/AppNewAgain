@@ -6,10 +6,11 @@
 - Backend: Firebase (Cloud Firestore)
 
 ## Files
-- `src/navigation/AppNavigator.tsx`: Custom top tab bar & navigation stack.
-- `src/screens/CalendarScreen.tsx`: Daily appointments, team conflicts, budget display, maps.
-- `src/screens/RouteScreen.tsx`: Daily multi-stop itinerary & Google Maps route generator.
-- `src/screens/AppointmentsScreen.tsx`: Booking, team selector, AI slot optimizer, budget.
+- `src/navigation/AppNavigator.tsx`: Custom top tab bar & navigation stack (Calendario, Rutas, Nueva Cita, Clientes, Servicios).
+- `src/screens/CalendarScreen.tsx`: Multi-column daily view by team, conflict alerts, budget, call buttons.
+- `src/screens/RouteScreen.tsx`: Daily itinerary with team filter, direct phone call button, multi-stop Google Maps URL.
+- `src/screens/AppointmentsScreen.tsx`: Booking, phone lookup, client autofill, address validation, AI slot optimizer, budget.
+- `src/screens/ClientsScreen.tsx`: Client database (CRM), search by phone/name, total revenue, full service history.
 - `src/screens/ServicesScreen.tsx`: CRUD services catalog (name, duration, base price).
 - `src/config/firebase.ts`: Firebase configuration & db init.
 - `App.tsx`: Main entry point.

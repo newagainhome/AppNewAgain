@@ -7,6 +7,7 @@ import CalendarScreen from '../screens/CalendarScreen';
 import AppointmentsScreen from '../screens/AppointmentsScreen';
 import ServicesScreen from '../screens/ServicesScreen';
 import RouteScreen from '../screens/RouteScreen';
+import ClientsScreen from '../screens/ClientsScreen';
 
 const Tab = createMaterialTopTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -80,6 +81,7 @@ function TopTabs() {
       <Tab.Screen name="Calendar" component={CalendarScreen} options={{ tabBarLabel: 'Calendario' }} />
       <Tab.Screen name="Route" component={RouteScreen} options={{ tabBarLabel: 'Rutas' }} />
       <Tab.Screen name="Appointments" component={AppointmentsScreen} options={{ tabBarLabel: 'Nueva Cita' }} />
+      <Tab.Screen name="Clients" component={ClientsScreen} options={{ tabBarLabel: 'Clientes' }} />
       <Tab.Screen name="Services" component={ServicesScreen} options={{ tabBarLabel: 'Servicios' }} />
     </Tab.Navigator>
   );
@@ -123,7 +125,7 @@ const styles = StyleSheet.create({
     borderBottomColor: 'transparent'
   },
   tabButtonActive: {
-    borderBottomColor: '#4a9b40', // Verde de la marca para la pestaña activa
+    borderBottomColor: '#4a9b40',
     backgroundColor: '#f4f8fb'
   },
   tabButtonInactive: {
@@ -131,9 +133,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff'
   },
   tabText: {
-    color: '#002a54', // AZUL MARINO EN TODAS LAS PESTAÑAS
-    fontWeight: 'bold', // EN NEGRITA
-    fontSize: 15,
+    color: '#002a54',
+    fontWeight: 'bold',
+    fontSize: 14,
     textAlign: 'center'
   },
   tabTextActive: {
@@ -144,6 +146,6 @@ const styles = StyleSheet.create({
   tabTextInactive: {
     color: '#002a54',
     fontWeight: 'bold',
-    opacity: 0.65 // Azul más suave cuando no está seleccionada para diferenciar
+    opacity: 0.65
   }
 });

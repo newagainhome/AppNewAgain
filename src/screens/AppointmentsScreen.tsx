@@ -10,13 +10,15 @@ import {
   ActivityIndicator,
   Linking
 } from 'react-native';
-import { collection, addDoc, onSnapshot, query, where, getDocs } from 'firebase/firestore';
+import { collection, addDoc, updateDoc, doc, onSnapshot, query, where, getDocs } from 'firebase/firestore';
 import { Calendar } from 'react-native-calendars';
 import { db } from '../config/firebase';
 
 export default function AppointmentsScreen({ navigation }: any) {
   const [client, setClient] = useState('');
   const [phone, setPhone] = useState('');
+  const [existingClientData, setExistingClientData] = useState<any>(null);
+
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [time, setTime] = useState('');
   
@@ -75,6 +77,41 @@ export default function AppointmentsScreen({ navigation }: any) {
     return () => unsubscribe();
   }, [date]);
 
+  // BUSCADOR AUTOMÁTICO DE CLIENTES POR TELÉFONO
+  const handlePhoneChange = async (text: string) => {
+    setPhone(text);
+    const cleanPhone = text.trim();
+    if (cleanPhone.length >= 6) {
+      try {
+        const qClient = query(collection(db, 'clients'), where('phone', '==', cleanPhone));
+        const snap = await getDocs(qClient);
+        if (!snap.empty) {
+          const clientFound = { id: snap.docs[0].id, ...snap.docs[0].data() };
+          setExistingClientData(clientFound);
+        } else {
+          setExistingClientData(null);
+        }
+      } catch (e) {
+        console.log(e);
+      }
+    } else {
+      setExistingClientData(null);
+    }
+  };
+
+  const autofillClient = () => {
+    if (existingClientData) {
+      if (existingClientData.name) setClient(existingClientData.name);
+      if (existingClientData.address) {
+        setAddressInput(existingClientData.address);
+        setValidatedAddress(existingClientData.address);
+        setIsValidated(true);
+      }
+      if (existingClientData.detailedInfo) setDetailedInfo(existingClientData.detailedInfo);
+      setExistingClientData(null);
+    }
+  };
+
   // BÚSQUEDA ROBUSTA DE DIRECCIONES (Compatible con Web y CORS)
   const searchAddress = async (text: string) => {
     setAddressInput(text);
@@ -88,7 +125,6 @@ export default function AppointmentsScreen({ navigation }: any) {
 
     setIsValidating(true);
     try {
-      // 1. Motor principal: Photon Geocoding
       const photonUrl = `https://photon.komoot.io/api/?q=${encodeURIComponent(text)}&limit=6&lat=40.4168&lon=-3.7038`;
       const res = await fetch(photonUrl);
       const data = await res.json();
@@ -110,26 +146,6 @@ export default function AppointmentsScreen({ navigation }: any) {
         });
         setAddressSuggestions(results);
         return;
-      }
-
-      // 2. Motor secundario: OpenStreetMap Nominatim
-      const nomUrl = `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=5&countrycodes=es&q=${encodeURIComponent(text)}`;
-      const nomRes = await fetch(nomUrl);
-      const nomData = await nomRes.json();
-      if (Array.isArray(nomData) && nomData.length > 0) {
-        const results = nomData.map((item: any) => {
-          const addr = item.address || {};
-          const street = addr.road || addr.pedestrian || addr.street || item.name || '';
-          const num = addr.house_number ? `, ${addr.house_number}` : '';
-          const city = addr.city || addr.town || addr.village || addr.municipality || '';
-          const postcode = addr.postcode ? ` (${addr.postcode})` : '';
-          return {
-            title: `${street}${num}`.trim() || item.display_name,
-            subtitle: `🏛️ ${city}${postcode}`,
-            fullFormatted: `${street}${num}, ${city}${postcode}`.trim()
-          };
-        });
-        setAddressSuggestions(results);
       }
     } catch (error) {
       console.log('Error buscando sugerencias:', error);
@@ -285,9 +301,13 @@ export default function AppointmentsScreen({ navigation }: any) {
 
     try {
       const finalTeam = team || (teams[0]?.name ?? 'Equipo 1');
+      const cleanPhone = phone.trim();
+      const cleanClient = client.trim();
+
+      // 1. Guardar la cita
       await addDoc(collection(db, 'appointments'), {
-        client: client.trim(),
-        phone: phone.trim(),
+        client: cleanClient,
+        phone: cleanPhone,
         date,
         time,
         address: finalAddress,
@@ -299,8 +319,38 @@ export default function AppointmentsScreen({ navigation }: any) {
         createdAt: new Date()
       });
 
+      // 2. Gestionar la ficha de Cliente (Crear nuevo o Actualizar existente)
+      if (cleanPhone) {
+        const qClient = query(collection(db, 'clients'), where('phone', '==', cleanPhone));
+        const snap = await getDocs(qClient);
+
+        if (!snap.empty) {
+          // Cliente existente: actualizar datos si cambiaron
+          const existingDoc = snap.docs[0];
+          await updateDoc(doc(db, 'clients', existingDoc.id), {
+            name: cleanClient,
+            address: finalAddress,
+            detailedInfo: detailedInfo.trim(),
+            lastServiceDate: date,
+            updatedAt: new Date()
+          });
+        } else {
+          // Cliente nuevo: registrar en cartera de clientes
+          await addDoc(collection(db, 'clients'), {
+            name: cleanClient,
+            phone: cleanPhone,
+            address: finalAddress,
+            detailedInfo: detailedInfo.trim(),
+            createdAt: new Date(),
+            lastServiceDate: date
+          });
+        }
+      }
+
+      // Resetear estado
       setClient('');
       setPhone('');
+      setExistingClientData(null);
       setTime('');
       setAddressInput('');
       setValidatedAddress(null);
@@ -329,7 +379,29 @@ export default function AppointmentsScreen({ navigation }: any) {
     <ScrollView style={styles.container}>
       <Text style={styles.title}>Programar Nueva Cita</Text>
       
-      {/* DATOS DEL CLIENTE */}
+      {/* TELÉFONO Y DETECCIÓN AUTOMÁTICA DE CLIENTE */}
+      <View style={{ marginBottom: 12 }}>
+        <Text style={styles.inputLabel}>Teléfono de contacto del cliente:</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Ej: 612 345 678"
+          keyboardType="phone-pad"
+          value={phone}
+          onChangeText={handlePhoneChange}
+        />
+        {existingClientData && (
+          <View style={styles.existingClientBox}>
+            <Text style={styles.existingClientText}>
+              ⭐ ¡Cliente habitual encontrado! ({existingClientData.name})
+            </Text>
+            <TouchableOpacity style={styles.autofillBtn} onPress={autofillClient}>
+              <Text style={styles.autofillBtnText}>⚡ Autocompletar datos del cliente</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+      </View>
+
+      {/* NOMBRE DEL CLIENTE */}
       <View style={{ marginBottom: 12 }}>
         <Text style={styles.inputLabel}>Nombre del cliente: *</Text>
         <TextInput
@@ -337,17 +409,6 @@ export default function AppointmentsScreen({ navigation }: any) {
           placeholder="Ej: Laura García"
           value={client}
           onChangeText={setClient}
-        />
-      </View>
-
-      <View style={{ marginBottom: 12 }}>
-        <Text style={styles.inputLabel}>Teléfono de contacto:</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Ej: 612 345 678"
-          keyboardType="phone-pad"
-          value={phone}
-          onChangeText={setPhone}
         />
       </View>
       
@@ -380,7 +441,6 @@ export default function AppointmentsScreen({ navigation }: any) {
           </View>
         )}
 
-        {/* Listado de sugerencias oficiales verificadas */}
         {addressSuggestions.length > 0 && (
           <View style={styles.suggestionsCard}>
             <Text style={styles.suggestionsHeader}>📍 Sugerencias encontradas (toca para autocompletar):</Text>
@@ -520,6 +580,18 @@ const styles = StyleSheet.create({
   input: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#ddd', padding: 12, borderRadius: 8, fontSize: 15 },
   inputValidated: { borderColor: '#4a9b40', borderWidth: 2, backgroundColor: '#fafffa' },
   
+  existingClientBox: {
+    backgroundColor: '#e8f4fd',
+    borderWidth: 1,
+    borderColor: '#b6daf7',
+    padding: 10,
+    borderRadius: 8,
+    marginTop: 6
+  },
+  existingClientText: { color: '#0c5460', fontWeight: 'bold', fontSize: 13, marginBottom: 6 },
+  autofillBtn: { backgroundColor: '#002a54', paddingVertical: 8, paddingHorizontal: 12, borderRadius: 6, alignItems: 'center' },
+  autofillBtnText: { color: '#fff', fontWeight: 'bold', fontSize: 13 },
+
   // Validación de Dirección
   addressSection: { marginBottom: 12 },
   addressInputRow: { flexDirection: 'row', gap: 6, alignItems: 'center', marginBottom: 6 },
