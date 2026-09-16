@@ -28,16 +28,16 @@ function TopTabs() {
     <Tab.Navigator
       screenOptions={{
         tabBarActiveTintColor: '#4a9b40',
-        tabBarInactiveTintColor: '#e0e0e0',
-        tabBarStyle: { backgroundColor: '#002a54' },
+        tabBarInactiveTintColor: '#ffffff',
+        tabBarStyle: { backgroundColor: '#002a54', height: 55, justifyContent: 'center' },
         tabBarIndicatorStyle: { backgroundColor: '#4a9b40', height: 4 },
-        tabBarLabelStyle: { fontWeight: 'bold', fontSize: 12 }
+        tabBarLabelStyle: { fontWeight: 'bold', fontSize: 14, textTransform: 'none', marginTop: 10 }
       }}
     >
-      <Tab.Screen name="Calendar" component={CalendarScreen} options={{ title: 'Calendario' }} />
-      <Tab.Screen name="Route" component={RouteScreen} options={{ title: 'Ruta' }} />
-      <Tab.Screen name="Appointments" component={AppointmentsScreen} options={{ title: 'Citas' }} />
-      <Tab.Screen name="Services" component={ServicesScreen} options={{ title: 'Servicios' }} />
+      <Tab.Screen name="Calendar" component={CalendarScreen} options={{ tabBarLabel: 'Calendario' }} />
+      <Tab.Screen name="Route" component={RouteScreen} options={{ tabBarLabel: 'Rutas' }} />
+      <Tab.Screen name="Appointments" component={AppointmentsScreen} options={{ tabBarLabel: 'Nueva Cita' }} />
+      <Tab.Screen name="Services" component={ServicesScreen} options={{ tabBarLabel: 'Servicios' }} />
     </Tab.Navigator>
   );
 }
