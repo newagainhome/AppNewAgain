@@ -31,9 +31,7 @@ function TopTabs() {
         tabBarInactiveTintColor: '#e0e0e0',
         tabBarStyle: { backgroundColor: '#002a54' },
         tabBarIndicatorStyle: { backgroundColor: '#4a9b40', height: 4 },
-        tabBarLabelStyle: { fontWeight: 'bold', fontSize: 12 },
-        tabBarScrollEnabled: true, // Permite deslizar si hay muchas pestañas
-        tabBarItemStyle: { width: 'auto', paddingHorizontal: 15 } // Ajusta el tamaño al contenido
+        tabBarLabelStyle: { fontWeight: 'bold', fontSize: 12 }
       }}
     >
       <Tab.Screen name="Calendar" component={CalendarScreen} options={{ title: 'Calendario' }} />
