@@ -210,7 +210,7 @@ export default function CalendarScreen({ route, navigation }: any) {
   const requestGoogleReview = async (item: Appointment) => {
     if (!item.phone) return alert('El cliente no tiene teléfono guardado.');
     
-    const message = `¡Hola ${item.client}! 👋\nEsperamos que hayas quedado encantado con la limpieza de tu vehículo. 🚗✨\n\nPara nosotros tu opinión es fundamental. Si te ha gustado el resultado, ¿nos regalarías 1 minuto para dejarnos 5 estrellitas en Google? Nos ayuda muchísimo a seguir creciendo. 🙏\n\n⭐ Puedes hacerlo aquí: https://g.page/r/Cby71i4U3YJmEBM/review\n\n¡Mil gracias por confiar en InnovaNor / NewAgain!`;
+    const message = `¡Hola ${item.client}! 👋\nEsperamos que hayas quedado encantado con la limpieza de tu ${item.serviceName.toLowerCase()}. ✨\n\nPara nosotros tu opinión es fundamental. Si te ha gustado el resultado, ¿nos regalarías 1 minuto para dejarnos 5 estrellitas en Google? Nos ayuda muchísimo a seguir creciendo. 🙏\n\n⭐ Puedes hacerlo aquí: https://g.page/r/Cby71i4U3YJmEBM/review\n\n¡Mil gracias por confiar en NewAgainClean!`;
     
     let phoneNum = item.phone.replace(/\s+/g, '');
     if (phoneNum.length === 9 && (phoneNum.startsWith('6') || phoneNum.startsWith('7') || phoneNum.startsWith('8') || phoneNum.startsWith('9'))) {
