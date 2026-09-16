@@ -9,6 +9,7 @@ interface InventoryItem {
   category: 'maquinaria' | 'productos' | 'otros';
   team: string;
   stock?: number;
+  minStockAlert?: number;
   totalHours?: number;
   createdAt: any;
 }
@@ -20,6 +21,7 @@ export default function InventoryScreen() {
   
   // Form state
   const [name, setName] = useState('');
+  const [minStock, setMinStock] = useState('2');
   const [category, setCategory] = useState<'maquinaria' | 'productos' | 'otros'>('productos');
   const [selectedTeam, setSelectedTeam] = useState('Oficina/General');
 
@@ -54,16 +56,24 @@ export default function InventoryScreen() {
       alert('Por favor, introduce el nombre del artículo.');
       return;
     }
+    
+    let parsedMinStock = 2;
+    if (activeTab !== 'maquinaria') {
+      parsedMinStock = parseInt(minStock);
+      if (isNaN(parsedMinStock)) parsedMinStock = 2;
+    }
+
     try {
       const newItem = {
         name: name.trim(),
         category: activeTab,
         team: selectedTeam,
         createdAt: new Date(),
-        ...(activeTab === 'maquinaria' ? { totalHours: 0 } : { stock: 0 })
+        ...(activeTab === 'maquinaria' ? { totalHours: 0 } : { stock: 0, minStockAlert: parsedMinStock })
       };
       await addDoc(collection(db, 'inventory'), newItem);
       setName('');
+      setMinStock('2');
     } catch (error) {
       alert('Error al añadir el artículo.');
     }
@@ -126,11 +136,20 @@ export default function InventoryScreen() {
         <Text style={styles.formTitle}>Añadir Nuevo Artículo</Text>
         <View style={styles.formRow}>
           <TextInput
-            style={styles.input}
-            placeholder="Nombre del artículo (ej. Limpiacristales 5L)"
+            style={[styles.input, { flex: 1 }]}
+            placeholder="Nombre (ej. Limpiacristales 5L)"
             value={name}
             onChangeText={setName}
           />
+          {activeTab !== 'maquinaria' && (
+            <TextInput
+              style={[styles.input, { width: 90 }]}
+              placeholder="Alerta en..."
+              keyboardType="numeric"
+              value={minStock}
+              onChangeText={setMinStock}
+            />
+          )}
         </View>
 
         <Text style={styles.label}>Asignar a Equipo (opcional):</Text>
@@ -160,42 +179,46 @@ export default function InventoryScreen() {
         <FlatList
           data={filteredItems}
           keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <View style={[styles.itemCard, item.stock !== undefined && item.stock <= 2 ? styles.itemCardAlert : null]}>
-              <View style={styles.itemInfo}>
-                <Text style={styles.itemName}>{item.name}</Text>
-                <Text style={styles.itemTeam}>{item.team === 'Oficina/General' ? '🏢 General' : `🚐 ${item.team}`}</Text>
+          renderItem={({ item }) => {
+            const isAlert = item.category !== 'maquinaria' && item.stock !== undefined && item.stock <= (item.minStockAlert ?? 2);
+            return (
+              <View style={[styles.itemCard, isAlert ? styles.itemCardAlert : null]}>
+                <View style={styles.itemInfo}>
+                  <Text style={styles.itemName}>{item.name}</Text>
+                  <Text style={styles.itemTeam}>{item.team === 'Oficina/General' ? '🏢 General' : `🚐 ${item.team}`}</Text>
+                  
+                  {item.category === 'maquinaria' ? (
+                    <Text style={styles.itemStat}>Uso acumulado: <Text style={{fontWeight:'bold', color:'#002a54'}}>{item.totalHours || 0} horas</Text></Text>
+                  ) : (
+                    <Text style={[styles.itemStat, isAlert && {color: '#d9534f', fontWeight: 'bold'}]}>
+                      Stock actual: <Text style={{fontWeight:'bold'}}>{item.stock || 0} u.</Text>
+                      <Text style={{fontSize: 10, color: '#999', fontWeight: 'normal'}}> (Avisa en {item.minStockAlert ?? 2})</Text>
+                    </Text>
+                  )}
+                </View>
                 
-                {item.category === 'maquinaria' ? (
-                  <Text style={styles.itemStat}>Uso acumulado: <Text style={{fontWeight:'bold', color:'#002a54'}}>{item.totalHours || 0} horas</Text></Text>
-                ) : (
-                  <Text style={[styles.itemStat, item.stock !== undefined && item.stock <= 2 && {color: '#d9534f', fontWeight: 'bold'}]}>
-                    Stock actual: <Text style={{fontWeight:'bold'}}>{item.stock || 0} u.</Text>
-                  </Text>
-                )}
-              </View>
-              
-              <View style={styles.itemActions}>
-                {item.category === 'maquinaria' ? (
-                  <TouchableOpacity style={styles.actionBtnBlue} onPress={() => addHours(item.id)}>
-                    <Text style={styles.actionBtnText}>+ Horas</Text>
+                <View style={styles.itemActions}>
+                  {item.category === 'maquinaria' ? (
+                    <TouchableOpacity style={styles.actionBtnBlue} onPress={() => addHours(item.id)}>
+                      <Text style={styles.actionBtnText}>+ Horas</Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <>
+                      <TouchableOpacity style={styles.actionBtnRed} onPress={() => adjustStock(item.id, -1)}>
+                        <Text style={styles.actionBtnText}>- 1 Gasto</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity style={styles.actionBtnGreen} onPress={() => adjustStock(item.id, 1)}>
+                        <Text style={styles.actionBtnText}>+ Stock</Text>
+                      </TouchableOpacity>
+                    </>
+                  )}
+                  <TouchableOpacity style={styles.iconBtn} onPress={() => deleteItem(item.id, item.name)}>
+                    <Text style={{fontSize: 16}}>🗑️</Text>
                   </TouchableOpacity>
-                ) : (
-                  <>
-                    <TouchableOpacity style={styles.actionBtnRed} onPress={() => adjustStock(item.id, -1)}>
-                      <Text style={styles.actionBtnText}>- 1 Gasto</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.actionBtnGreen} onPress={() => adjustStock(item.id, 1)}>
-                      <Text style={styles.actionBtnText}>+ Stock</Text>
-                    </TouchableOpacity>
-                  </>
-                )}
-                <TouchableOpacity style={styles.iconBtn} onPress={() => deleteItem(item.id, item.name)}>
-                  <Text style={{fontSize: 16}}>🗑️</Text>
-                </TouchableOpacity>
+                </View>
               </View>
-            </View>
-          )}
+            );
+          }}
           ListEmptyComponent={<Text style={styles.empty}>No hay artículos en esta categoría.</Text>}
         />
       )}

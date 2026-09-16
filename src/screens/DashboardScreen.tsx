@@ -292,8 +292,11 @@ export default function DashboardScreen() {
 
       if (item.category === 'maquinaria') {
         machineryList.push(item);
-      } else if (item.stock !== undefined && item.stock <= 2) {
-        lowStockList.push(item);
+      } else if (item.stock !== undefined) {
+        const threshold = item.minStockAlert !== undefined ? item.minStockAlert : 2;
+        if (item.stock <= threshold) {
+          lowStockList.push(item);
+        }
       }
     });
 
