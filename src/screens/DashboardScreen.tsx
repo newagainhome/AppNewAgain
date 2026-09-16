@@ -307,7 +307,7 @@ export default function DashboardScreen() {
       {loading ? (
         <ActivityIndicator size="large" color="#4a9b40" style={{ marginVertical: 30 }} />
       ) : (
-        <>
+        <View style={styles.dashboardGrid}>
           {/* SECCIÓN 1: FACTURACIÓN */}
           <View style={styles.sectionCard}>
             <View style={styles.sectionHeader}>
@@ -318,12 +318,12 @@ export default function DashboardScreen() {
               <View style={[styles.kpiBox, { backgroundColor: '#eaf5ea', borderColor: '#b2dfb2' }]}>
                 <Text style={styles.kpiLabel}>Facturación Total</Text>
                 <Text style={[styles.kpiValue, { color: '#256320' }]}>{billingStats.total.toLocaleString()} €</Text>
-                <Text style={styles.kpiSub}>En el periodo seleccionado</Text>
+                <Text style={styles.kpiSub}>En el periodo</Text>
               </View>
               <View style={[styles.kpiBox, { backgroundColor: '#eef4fa', borderColor: '#cfe0f2' }]}>
                 <Text style={styles.kpiLabel}>Ticket Medio / Cita</Text>
                 <Text style={[styles.kpiValue, { color: '#002a54' }]}>{billingStats.averageTicket} €</Text>
-                <Text style={styles.kpiSub}>Promedio por servicio</Text>
+                <Text style={styles.kpiSub}>Promedio/servicio</Text>
               </View>
             </View>
 
@@ -350,7 +350,7 @@ export default function DashboardScreen() {
               <View style={[styles.kpiBox, { backgroundColor: '#f3e8fd', borderColor: '#d9b6fc' }]}>
                 <Text style={styles.kpiLabel}>Servicios Totales</Text>
                 <Text style={[styles.kpiValue, { color: '#6b21a8' }]}>{servicesStats.totalCount}</Text>
-                <Text style={styles.kpiSub}>Limpiezas ejecutadas/programadas</Text>
+                <Text style={styles.kpiSub}>Limpiezas ejecutadas</Text>
               </View>
             </View>
 
@@ -360,7 +360,7 @@ export default function DashboardScreen() {
                 <View key={srv.name} style={styles.serviceItem}>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
                     <Text style={styles.serviceItemName}>#{idx + 1} {srv.name}</Text>
-                    <Text style={styles.serviceItemCount}>{srv.count} contrataciones</Text>
+                    <Text style={styles.serviceItemCount}>{srv.count}</Text>
                   </View>
                   <View style={styles.progressBarBg}>
                     <View
@@ -387,22 +387,22 @@ export default function DashboardScreen() {
 
             <View style={styles.efficiencyMainBox}>
               <Text style={styles.efficiencyPct}>{efficiencyStats.efficiencyPct}%</Text>
-              <Text style={styles.efficiencyLabel}>Tasa de Ocupación Activa en Limpiezas</Text>
+              <Text style={styles.efficiencyLabel}>Ocupación Activa</Text>
               <Text style={styles.efficiencySub}>
-                (Horas efectivas limpiando en casas de clientes frente a la jornada total de la furgoneta)
+                (Horas limpiando frente a la jornada total)
               </Text>
             </View>
 
             <View style={styles.kpiRow}>
               <View style={[styles.kpiBox, { backgroundColor: '#eaf5ea', borderColor: '#b2dfb2' }]}>
-                <Text style={styles.kpiLabel}>Tiempo en Limpiezas</Text>
+                <Text style={styles.kpiLabel}>En Limpiezas</Text>
                 <Text style={[styles.kpiValue, { color: '#256320' }]}>{efficiencyStats.serviceHours} h</Text>
-                <Text style={styles.kpiSub}>Trabajo facturable directo</Text>
+                <Text style={styles.kpiSub}>Trabajo facturable</Text>
               </View>
               <View style={[styles.kpiBox, { backgroundColor: '#fff3e0', borderColor: '#ffe0b2' }]}>
-                <Text style={styles.kpiLabel}>Tiempo de Viaje / Espera</Text>
+                <Text style={styles.kpiLabel}>De Viaje</Text>
                 <Text style={[styles.kpiValue, { color: '#e65100' }]}>{efficiencyStats.deadOrTravelHours} h</Text>
-                <Text style={styles.kpiSub}>Conducción entre domicilios</Text>
+                <Text style={styles.kpiSub}>Conducción</Text>
               </View>
             </View>
           </View>
@@ -417,16 +417,16 @@ export default function DashboardScreen() {
               <View style={[styles.kpiBox, { backgroundColor: '#eef4fa', borderColor: '#cfe0f2' }]}>
                 <Text style={styles.kpiLabel}>Cartera Total</Text>
                 <Text style={[styles.kpiValue, { color: '#002a54' }]}>{clientStats.totalClients}</Text>
-                <Text style={styles.kpiSub}>Clientes registrados históricos</Text>
+                <Text style={styles.kpiSub}>Histórico</Text>
               </View>
               <View style={[styles.kpiBox, { backgroundColor: '#eaf5ea', borderColor: '#b2dfb2' }]}>
                 <Text style={styles.kpiLabel}>Nuevos Clientes</Text>
                 <Text style={[styles.kpiValue, { color: '#256320' }]}>+{clientStats.newClients}</Text>
-                <Text style={styles.kpiSub}>Adquiridos en este periodo</Text>
+                <Text style={styles.kpiSub}>En el periodo</Text>
               </View>
             </View>
           </View>
-        </>
+        </View>
       )}
 
       <View style={{ height: 40 }} />
@@ -488,12 +488,22 @@ const styles = StyleSheet.create({
   teamChipTextInactive: { color: '#333', fontSize: 12 },
   rangeNotice: { fontSize: 12, color: '#666', fontStyle: 'italic', marginTop: 4 },
 
+  // Grid
+  dashboardGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 15,
+    justifyContent: 'space-between'
+  },
+
   // Secciones
   sectionCard: {
+    flex: 1,
+    minWidth: 320,
     backgroundColor: '#ffffff',
     borderRadius: 10,
     padding: 15,
-    marginBottom: 15,
+    marginBottom: 0,
     borderWidth: 1,
     borderColor: '#dbe2ea',
     elevation: 2
