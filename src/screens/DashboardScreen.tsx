@@ -154,25 +154,40 @@ export default function DashboardScreen() {
     return { totalIncome, totalExpenses, netProfit, byTeam };
   }, [filteredAppointments, filteredExpenses]);
 
-  // 2. CÁLCULO DE ANÁLISIS DE SERVICIOS
+  // 2. CÁLCULO DE RENDIMIENTO POR SERVICIO
   const servicesStats = useMemo(() => {
     const totalCount = filteredAppointments.length;
+    let totalBilling = 0;
+    let totalDurationMins = 0;
     const byService: Record<string, number> = {};
     const byTeamCount: Record<string, number> = {};
 
     filteredAppointments.forEach((app) => {
+      // 1. Conteo por nombre
       const sName = app.serviceName || 'Servicio general';
       byService[sName] = (byService[sName] || 0) + 1;
 
+      // 2. Conteo por equipo
       const tName = app.team || 'Equipo 1';
       byTeamCount[tName] = (byTeamCount[tName] || 0) + 1;
+      
+      // 3. Facturación
+      const price = parseFloat(app.price || '0');
+      totalBilling += isNaN(price) ? 0 : price;
+      
+      // 4. Duración
+      const dur = parseInt(app.duration || '60');
+      totalDurationMins += isNaN(dur) ? 0 : dur;
     });
+
+    const averageTicket = totalCount > 0 ? Math.round(totalBilling / totalCount) : 0;
+    const averageDurationMins = totalCount > 0 ? Math.round(totalDurationMins / totalCount) : 0;
 
     const topServices = Object.entries(byService)
       .map(([name, count]) => ({ name, count }))
       .sort((a, b) => b.count - a.count);
 
-    return { totalCount, byTeamCount, topServices };
+    return { totalCount, totalBilling, averageTicket, totalDurationMins, averageDurationMins, byTeamCount, topServices };
   }, [filteredAppointments]);
 
   // 3. CÁLCULO DE EFICIENCIA DE HORARIO
@@ -370,17 +385,34 @@ export default function DashboardScreen() {
             )}
           </View>
 
-          {/* SECCIÓN 2: ANÁLISIS DE SERVICIOS */}
+          {/* SECCIÓN 2: RENDIMIENTO POR SERVICIO */}
           <View style={styles.sectionCard}>
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>2. 🧹 Análisis y Demanda de Servicios</Text>
+              <Text style={styles.sectionTitle}>2. 🧹 Rendimiento por Servicio</Text>
             </View>
 
             <View style={styles.kpiRow}>
-              <View style={[styles.kpiBox, { backgroundColor: '#f3e8fd', borderColor: '#d9b6fc' }]}>
-                <Text style={styles.kpiLabel}>Servicios Totales</Text>
-                <Text style={[styles.kpiValue, { color: '#6b21a8' }]}>{servicesStats.totalCount}</Text>
-                <Text style={styles.kpiSub}>Limpiezas ejecutadas</Text>
+              <View style={[styles.kpiBox, { backgroundColor: '#f0fdf4', borderColor: '#bbf7d0' }]}>
+                <Text style={styles.kpiLabel}>Facturación</Text>
+                <Text style={[styles.kpiValue, { color: '#166534' }]}>{servicesStats.totalBilling.toLocaleString()} €</Text>
+                <Text style={styles.kpiSub}>Total servicios</Text>
+              </View>
+              <View style={[styles.kpiBox, { backgroundColor: '#f0fdf4', borderColor: '#bbf7d0' }]}>
+                <Text style={styles.kpiLabel}>Ticket Medio</Text>
+                <Text style={[styles.kpiValue, { color: '#166534' }]}>{servicesStats.averageTicket} €</Text>
+                <Text style={styles.kpiSub}>Por servicio</Text>
+              </View>
+            </View>
+            <View style={styles.kpiRow}>
+              <View style={[styles.kpiBox, { backgroundColor: '#eff6ff', borderColor: '#bfdbfe' }]}>
+                <Text style={styles.kpiLabel}>Duración Total</Text>
+                <Text style={[styles.kpiValue, { color: '#1e3a8a' }]}>{(servicesStats.totalDurationMins / 60).toFixed(1)} h</Text>
+                <Text style={styles.kpiSub}>Horas trabajadas</Text>
+              </View>
+              <View style={[styles.kpiBox, { backgroundColor: '#eff6ff', borderColor: '#bfdbfe' }]}>
+                <Text style={styles.kpiLabel}>Duración Media</Text>
+                <Text style={[styles.kpiValue, { color: '#1e3a8a' }]}>{servicesStats.averageDurationMins} m</Text>
+                <Text style={styles.kpiSub}>Por servicio</Text>
               </View>
             </View>
 
