@@ -459,11 +459,26 @@ export default function CalendarScreen({ navigation }: any) {
               <ScrollView style={{ maxHeight: 500 }} showsVerticalScrollIndicator={false}>
                 <View style={styles.clientRow}>
                   <Text style={styles.client}>👤 {selectedAppointment.client}</Text>
-                  {selectedAppointment.phone ? (
-                    <TouchableOpacity style={styles.phoneBadge} onPress={() => callClient(selectedAppointment.phone)}>
-                      <Text style={styles.phoneText}>📞 Llámar</Text>
-                    </TouchableOpacity>
-                  ) : null}
+                  <View style={{ flexDirection: 'row', gap: 6 }}>
+                    {selectedAppointment.phone ? (
+                      <>
+                        <TouchableOpacity style={styles.phoneBadge} onPress={() => callClient(selectedAppointment.phone)}>
+                          <Text style={styles.phoneText}>📞 Llamar</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity 
+                          style={styles.chatBadge} 
+                          onPress={() => {
+                            let p = selectedAppointment.phone!.replace(/\s+/g, '');
+                            if (p.length === 9 && (p.startsWith('6') || p.startsWith('7') || p.startsWith('8') || p.startsWith('9'))) p = '34' + p;
+                            else if (p.startsWith('+')) p = p.substring(1);
+                            Linking.openURL(`https://wa.me/${p}`);
+                          }}
+                        >
+                          <Text style={styles.chatText}>💬 WhatsApp</Text>
+                        </TouchableOpacity>
+                      </>
+                    ) : null}
+                  </View>
                 </View>
 
                 {selectedAppointment.price ? (
@@ -728,8 +743,10 @@ const styles = StyleSheet.create({
   deleteIcon: { fontSize: 16, padding: 4 },
   clientRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6, flexWrap: 'wrap', gap: 6 },
   client: { fontSize: 14, color: '#333', fontWeight: 'bold' },
-  phoneBadge: { backgroundColor: '#eef7ee', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4, borderWidth: 1, borderColor: '#c5e6c5' },
+  phoneBadge: { backgroundColor: '#eef7ee', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4, borderWidth: 1, borderColor: '#c5e6c5' },
   phoneText: { color: '#256320', fontWeight: 'bold', fontSize: 12 },
+  chatBadge: { backgroundColor: '#e8f5e9', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4, borderWidth: 1, borderColor: '#a5d6a7' },
+  chatText: { color: '#2e7d32', fontWeight: 'bold', fontSize: 12 },
   priceContainer: {
     backgroundColor: '#eaf5ea',
     paddingHorizontal: 8,
