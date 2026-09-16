@@ -4,14 +4,26 @@ import { Calendar } from 'react-native-calendars';
 import { collection, onSnapshot, query, where } from 'firebase/firestore';
 import { db } from '../config/firebase';
 
-const TEAMS = ['Todos', 'Equipo 1', 'Equipo 2', 'Equipo 3'];
-
 export default function RouteScreen() {
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [appointments, setAppointments] = useState<any[]>([]);
+  const [teams, setTeams] = useState<any[]>([]);
   const [showCalendar, setShowCalendar] = useState(false);
   const [filterTeam, setFilterTeam] = useState('Todos');
 
+  // Cargar equipos dinámicos
+  useEffect(() => {
+    const qTeams = query(collection(db, 'teams'));
+    const unsubscribeTeams = onSnapshot(qTeams, (snapshot) => {
+      const teamsList: any[] = [];
+      snapshot.forEach(docSnap => teamsList.push({ id: docSnap.id, ...docSnap.data() }));
+      teamsList.sort((a, b) => a.name.localeCompare(b.name));
+      setTeams(teamsList);
+    });
+    return () => unsubscribeTeams();
+  }, []);
+
+  // Cargar citas del día
   useEffect(() => {
     const q = query(collection(db, 'appointments'), where('date', '==', selectedDate));
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -30,20 +42,22 @@ export default function RouteScreen() {
 
   const openFullRoute = () => {
     if (filterTeam === 'Todos') {
-      Alert.alert("Aviso", "Selecciona un equipo específico arriba para generar su ruta en Google Maps.");
+      alert("Selecciona un equipo específico arriba para generar su ruta en Google Maps.");
       return;
     }
     
     const addresses = filteredAppointments.map(app => app.address).filter(addr => addr && addr.trim() !== '');
     if (addresses.length === 0) {
-      Alert.alert("Aviso", `No hay direcciones para el ${filterTeam} este día.`);
+      alert(`No hay direcciones registradas para el ${filterTeam} este día.`);
       return;
     }
     
     const baseUrl = "https://www.google.com/maps/dir/";
     const encodedAddresses = addresses.map(addr => encodeURIComponent(addr)).join('/');
-    Linking.openURL(baseUrl + encodedAddresses).catch(() => Alert.alert("Error", "No se pudo abrir el mapa."));
+    Linking.openURL(baseUrl + encodedAddresses).catch(() => alert("No se pudo abrir el mapa."));
   };
+
+  const teamOptions = ['Todos', ...(teams.length > 0 ? teams.map(t => t.name) : ['Equipo 1', 'Equipo 2'])];
 
   return (
     <View style={styles.container}>
@@ -63,9 +77,9 @@ export default function RouteScreen() {
         </View>
       )}
 
-      {/* Selector de Equipo para ver la ruta */}
+      {/* Selector de Equipo dinámico para ver la ruta */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.teamFilterRow}>
-        {TEAMS.map(t => (
+        {teamOptions.map(t => (
           <TouchableOpacity 
             key={t} 
             style={[styles.teamFilterBtn, filterTeam === t && styles.teamFilterBtnSelected]}

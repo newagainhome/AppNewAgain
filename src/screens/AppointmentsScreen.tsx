@@ -4,14 +4,14 @@ import { collection, addDoc, onSnapshot, query, where, getDocs } from 'firebase/
 import { Calendar } from 'react-native-calendars';
 import { db } from '../config/firebase';
 
-const TEAMS = ['Equipo 1', 'Equipo 2', 'Equipo 3'];
-
 export default function AppointmentsScreen({ navigation }: any) {
   const [client, setClient] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [time, setTime] = useState('');
   const [address, setAddress] = useState('');
+  const [price, setPrice] = useState('');
   const [team, setTeam] = useState('Equipo 1');
+  const [teams, setTeams] = useState<any[]>([]);
   const [showCalendar, setShowCalendar] = useState(false);
   
   const [services, setServices] = useState<any[]>([]);
@@ -20,28 +20,53 @@ export default function AppointmentsScreen({ navigation }: any) {
   const [existingAppointments, setExistingAppointments] = useState<any[]>([]);
   const [smartSuggestion, setSmartSuggestion] = useState<any>(null);
 
+  // 1. Cargar Equipos dinámicos desde Firestore
+  useEffect(() => {
+    const qTeams = query(collection(db, 'teams'));
+    const unsubscribeTeams = onSnapshot(qTeams, (snapshot) => {
+      const teamsList: any[] = [];
+      snapshot.forEach(docSnap => teamsList.push({ id: docSnap.id, ...docSnap.data() }));
+      teamsList.sort((a, b) => a.name.localeCompare(b.name));
+      setTeams(teamsList);
+      if (teamsList.length > 0 && !team) {
+        setTeam(teamsList[0].name);
+      }
+    });
+    return () => unsubscribeTeams();
+  }, []);
+
+  // 2. Cargar Servicios
   useEffect(() => {
     const unsubscribe = onSnapshot(collection(db, 'services'), (snapshot) => {
       const srvs: any[] = [];
-      snapshot.forEach(doc => srvs.push({ id: doc.id, ...doc.data() }));
+      snapshot.forEach(docSnap => srvs.push({ id: docSnap.id, ...docSnap.data() }));
       setServices(srvs);
     });
     return () => unsubscribe();
   }, []);
 
+  // 3. Cargar Citas para el día seleccionado
   useEffect(() => {
     const q = query(collection(db, 'appointments'), where('date', '==', date));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const appsList: any[] = [];
-      snapshot.forEach(doc => appsList.push({ id: doc.id, ...doc.data() }));
+      snapshot.forEach(docSnap => appsList.push({ id: docSnap.id, ...docSnap.data() }));
       setExistingAppointments(appsList);
     });
     return () => unsubscribe();
   }, [date]);
 
+  const handleSelectService = (srv: any) => {
+    setSelectedService(srv);
+    if (srv.price && !price) {
+      setPrice(srv.price);
+    }
+  };
+
   const checkSlotStatus = (testTime: string) => {
     if (!selectedService) return { conflict: false };
-    const teamApps = existingAppointments.filter(a => (a.team || 'Equipo 1') === team);
+    const currentTeam = team || (teams[0]?.name ?? 'Equipo 1');
+    const teamApps = existingAppointments.filter(a => (a.team || teams[0]?.name || 'Equipo 1') === currentTeam);
 
     const getMinutes = (t: string) => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
     const newStart = getMinutes(testTime);
@@ -81,7 +106,7 @@ export default function AppointmentsScreen({ navigation }: any) {
       const q = query(collection(db, 'appointments'), where('date', '>=', startStr), where('date', '<=', endStr));
       const snapshot = await getDocs(q);
       const appsInRange: any[] = [];
-      snapshot.forEach(doc => appsInRange.push({ id: doc.id, ...doc.data() }));
+      snapshot.forEach(docSnap => appsInRange.push({ id: docSnap.id, ...docSnap.data() }));
 
       const getSimilarity = (addr1: string, addr2: string) => {
         if(!addr1 || !addr2) return 0;
@@ -114,7 +139,7 @@ export default function AppointmentsScreen({ navigation }: any) {
         const suggestedStartAfter = existingEnd + 30; 
         const roundedAfter = Math.ceil(suggestedStartAfter / 15) * 15; 
         const suggestedTime = toTimeStr(roundedAfter);
-        const suggestedTeam = bestMatchApp.team || 'Equipo 1';
+        const suggestedTeam = bestMatchApp.team || teams[0]?.name || 'Equipo 1';
         
         setSmartSuggestion({
           date: bestMatchApp.date,
@@ -133,7 +158,7 @@ export default function AppointmentsScreen({ navigation }: any) {
 
   const saveAppointment = async () => {
     if (!client || !date || !time || !selectedService) {
-      alert("Faltan datos por rellenar.");
+      alert("Faltan datos obligatorios (cliente, servicio, fecha y hora).");
       return;
     }
     const status = checkSlotStatus(time);
@@ -142,13 +167,19 @@ export default function AppointmentsScreen({ navigation }: any) {
       return;
     }
     try {
+      const finalTeam = team || (teams[0]?.name ?? 'Equipo 1');
       await addDoc(collection(db, 'appointments'), {
-        client, date, time, address, team,
+        client: client.trim(),
+        date,
+        time,
+        address: address.trim(),
+        price: price.trim() || '',
+        team: finalTeam,
         serviceName: selectedService.name,
         duration: selectedService.duration,
         createdAt: new Date()
       });
-      setClient(''); setTime(''); setAddress(''); setSelectedService(null); setSmartSuggestion(null);
+      setClient(''); setTime(''); setAddress(''); setPrice(''); setSelectedService(null); setSmartSuggestion(null);
       navigation.navigate('Calendar');
     } catch (error) {
       alert("Error al guardar la cita.");
@@ -163,12 +194,15 @@ export default function AppointmentsScreen({ navigation }: any) {
     }
   }
 
+  const activeTeamsList = teams.length > 0 ? teams.map(t => t.name) : ['Equipo 1', 'Equipo 2'];
+
   return (
     <ScrollView style={styles.container}>
       <Text style={styles.title}>Programar Nueva Cita</Text>
       
       <TextInput style={styles.input} placeholder="Nombre del cliente" value={client} onChangeText={setClient} />
       <TextInput style={styles.input} placeholder="Dirección (Calle, Ciudad)" value={address} onChangeText={setAddress} />
+      <TextInput style={styles.input} placeholder="Presupuesto acordado (€) (opcional)" keyboardType="numeric" value={price} onChangeText={setPrice} />
 
       <Text style={styles.subtitle}>1. Servicio:</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.scrollRow}>
@@ -176,9 +210,11 @@ export default function AppointmentsScreen({ navigation }: any) {
           <TouchableOpacity 
             key={srv.id} 
             style={[styles.chipBtn, selectedService?.id === srv.id && styles.chipSelected]}
-            onPress={() => setSelectedService(srv)}
+            onPress={() => handleSelectService(srv)}
           >
-            <Text style={selectedService?.id === srv.id ? styles.textSelected : styles.textUnselected}>{srv.name} (⏱ {srv.duration}m)</Text>
+            <Text style={selectedService?.id === srv.id ? styles.textSelected : styles.textUnselected}>
+              {srv.name} (⏱ {srv.duration}m{srv.price ? ` · 💶 ${srv.price}€` : ''})
+            </Text>
           </TouchableOpacity>
         ))}
       </ScrollView>
@@ -206,9 +242,9 @@ export default function AppointmentsScreen({ navigation }: any) {
 
       <Text style={styles.subtitle}>2. Equipo Asignado:</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.scrollRow}>
-        {TEAMS.map(t => (
-          <TouchableOpacity key={t} style={[styles.chipBtn, team === t && styles.chipSelected]} onPress={() => setTeam(t)}>
-            <Text style={team === t ? styles.textSelected : styles.textUnselected}>{t}</Text>
+        {activeTeamsList.map(t => (
+          <TouchableOpacity key={t} style={[styles.chipBtn, (team || activeTeamsList[0]) === t && styles.chipSelected]} onPress={() => setTeam(t)}>
+            <Text style={(team || activeTeamsList[0]) === t ? styles.textSelected : styles.textUnselected}>🚐 {t}</Text>
           </TouchableOpacity>
         ))}
       </ScrollView>
