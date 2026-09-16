@@ -1025,7 +1025,7 @@ export default function CalendarScreen({ route, navigation }: any) {
                   </View>
                 )}
                 
-                {isStrictAdmin && (
+                {isAdmin && (
                   <TouchableOpacity style={styles.deleteApptIconBtn} onPress={() => deleteAppointment(selectedAppointment.id)}>
                     <Text style={styles.deleteApptIconBtnText}>🗑️</Text>
                   </TouchableOpacity>
