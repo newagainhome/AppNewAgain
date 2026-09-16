@@ -64,7 +64,7 @@ export default function ExpensesScreen() {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
-        quality: 0.3,
+        quality: 0.1, // Compresión máxima para ahorrar espacio en la nube
       });
       handleImageResult(result);
     } catch (error) {
@@ -76,7 +76,7 @@ export default function ExpensesScreen() {
     try {
       const result = await ImagePicker.launchCameraAsync({
         allowsEditing: true,
-        quality: 0.3,
+        quality: 0.1, // Compresión máxima para ahorrar espacio en la nube
       });
       handleImageResult(result);
     } catch (error) {
