@@ -3,6 +3,9 @@ import { View, Text, StyleSheet, TextInput, TouchableOpacity, FlatList, Activity
 import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy } from 'firebase/firestore';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import * as ImagePicker from 'expo-image-picker';
+import * as Print from 'expo-print';
+import * as Sharing from 'expo-sharing';
+import { Platform } from 'react-native';
 import { db, storage } from '../config/firebase';
 
 interface Expense {
@@ -131,6 +134,103 @@ export default function ExpensesScreen() {
     }
   };
 
+  // PDF EXPORT LOGIC
+  const [filterStart, setFilterStart] = useState(
+    new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+  );
+  const [filterEnd, setFilterEnd] = useState(new Date().toISOString().split('T')[0]);
+
+  const generatePDF = async () => {
+    const filteredExpenses = expenses.filter(e => e.date >= filterStart && e.date <= filterEnd);
+    if (filteredExpenses.length === 0) {
+      alert('No hay gastos en este rango de fechas para exportar.');
+      return;
+    }
+
+    const total = filteredExpenses.reduce((sum, e) => sum + e.amount, 0);
+
+    const rows = filteredExpenses.map(e => `
+      <tr>
+        <td style="padding: 10px; border-bottom: 1px solid #ddd;">${e.date}</td>
+        <td style="padding: 10px; border-bottom: 1px solid #ddd;"><strong>${e.concept}</strong><br/><small style="color: #666;">${e.team === 'Oficina/General' ? 'Oficina' : e.team}</small></td>
+        <td style="padding: 10px; border-bottom: 1px solid #ddd; font-weight: bold; color: #d9534f;">${e.amount.toFixed(2)} €</td>
+        <td style="padding: 10px; border-bottom: 1px solid #ddd; text-align: center;">${e.ticketUrl ? '✅' : '❌'}</td>
+      </tr>
+    `).join('');
+
+    const ticketsHtml = filteredExpenses.filter(e => e.ticketUrl).map(e => `
+      <div style="page-break-before: always; font-family: sans-serif; padding: 20px;">
+        <h2 style="color: #002a54;">Ticket Adjunto</h2>
+        <p><strong>Fecha:</strong> ${e.date}</p>
+        <p><strong>Concepto:</strong> ${e.concept}</p>
+        <p><strong>Importe:</strong> ${e.amount.toFixed(2)} €</p>
+        <img src="${e.ticketUrl}" style="max-width: 100%; max-height: 800px; border: 1px solid #ccc; margin-top: 15px;" />
+      </div>
+    `).join('');
+
+    const html = `
+      <html>
+        <head>
+          <style>
+            body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #333; margin: 0; padding: 0; }
+            .container { padding: 40px; }
+            .header { border-bottom: 2px solid #d9534f; padding-bottom: 15px; margin-bottom: 30px; }
+            h1 { color: #d9534f; margin: 0; font-size: 28px; }
+            .subtitle { color: #666; font-size: 16px; margin-top: 5px; }
+            table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
+            th { text-align: left; background-color: #f9f9f9; padding: 12px; color: #555; border-bottom: 2px solid #ddd; }
+            .total-box { background-color: #fdf3f4; border: 1px solid #f5c6cb; padding: 20px; border-radius: 8px; text-align: right; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>Informe de Gastos (Gestoría)</h1>
+              <div class="subtitle">Periodo: ${filterStart} a ${filterEnd}</div>
+            </div>
+            <table>
+              <thead>
+                <tr>
+                  <th>Fecha</th>
+                  <th>Concepto y Equipo</th>
+                  <th>Importe</th>
+                  <th style="text-align: center;">Ticket</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${rows}
+              </tbody>
+            </table>
+            <div class="total-box">
+              <h2 style="margin: 0; color: #721c24;">Total Periodo: ${total.toFixed(2)} €</h2>
+            </div>
+          </div>
+          ${ticketsHtml}
+        </body>
+      </html>
+    `;
+
+    try {
+      if (Platform.OS === 'web') {
+        const printWindow = window.open('', '_blank');
+        if (printWindow) {
+          printWindow.document.write(html);
+          printWindow.document.close();
+          setTimeout(() => printWindow.print(), 500);
+        } else {
+          alert('Permite las ventanas emergentes (pop-ups) para generar el PDF.');
+        }
+      } else {
+        const { uri } = await Print.printToFileAsync({ html });
+        if (await Sharing.isAvailableAsync()) {
+          await Sharing.shareAsync(uri, { UTI: '.pdf', mimeType: 'application/pdf' });
+        }
+      }
+    } catch (err) {
+      alert('Error al generar el PDF.');
+    }
+  };
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>💸 Registrar Nuevo Gasto</Text>
@@ -202,7 +302,32 @@ export default function ExpensesScreen() {
         )}
       </TouchableOpacity>
 
-      <Text style={styles.titleList}>Historial de Gastos</Text>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 25, marginBottom: 10 }}>
+        <Text style={[styles.titleList, { marginTop: 0, marginBottom: 0 }]}>Historial de Gastos</Text>
+      </View>
+
+      {/* Export Section */}
+      <View style={styles.exportCard}>
+        <Text style={styles.exportTitle}>📤 Exportar Informe a Gestoría (PDF)</Text>
+        <View style={styles.formRow}>
+          <TextInput
+            style={[styles.input, { flex: 1, backgroundColor: '#f0f4f8' }]}
+            placeholder="Desde YYYY-MM-DD"
+            value={filterStart}
+            onChangeText={setFilterStart}
+          />
+          <TextInput
+            style={[styles.input, { flex: 1, backgroundColor: '#f0f4f8' }]}
+            placeholder="Hasta YYYY-MM-DD"
+            value={filterEnd}
+            onChangeText={setFilterEnd}
+          />
+        </View>
+        <TouchableOpacity style={styles.buttonExport} onPress={generatePDF}>
+          <Text style={styles.buttonText}>📄 Generar PDF (Listado + Tickets)</Text>
+        </TouchableOpacity>
+      </View>
+
       {loading ? (
         <ActivityIndicator size="large" color="#d9534f" />
       ) : (
@@ -260,6 +385,11 @@ const styles = StyleSheet.create({
   previewImg: { width: 100, height: 100, borderRadius: 8, alignSelf: 'center', marginBottom: 5 },
   buttonAdd: { backgroundColor: '#d9534f', padding: 14, borderRadius: 8, alignItems: 'center' },
   buttonText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
+  
+  exportCard: { backgroundColor: '#fff', padding: 15, borderRadius: 8, marginBottom: 15, borderWidth: 1, borderColor: '#f5c6cb' },
+  exportTitle: { fontSize: 14, fontWeight: 'bold', color: '#721c24', marginBottom: 10 },
+  buttonExport: { backgroundColor: '#721c24', padding: 12, borderRadius: 8, alignItems: 'center', marginTop: 5 },
+  
   expenseCard: { backgroundColor: '#fff', padding: 15, borderRadius: 8, marginBottom: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderLeftWidth: 4, borderLeftColor: '#d9534f', elevation: 1 },
   expenseInfo: { flex: 1 },
   expenseDate: { fontSize: 12, color: '#777', fontWeight: 'bold', marginBottom: 2 },

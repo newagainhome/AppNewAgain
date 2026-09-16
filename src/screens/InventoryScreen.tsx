@@ -24,6 +24,7 @@ export default function InventoryScreen() {
   const [minStock, setMinStock] = useState('2');
   const [category, setCategory] = useState<'maquinaria' | 'productos' | 'otros'>('productos');
   const [selectedTeam, setSelectedTeam] = useState('Oficina/General');
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   const [activeTab, setActiveTab] = useState<'maquinaria' | 'productos' | 'otros'>('productos');
 
@@ -51,6 +52,21 @@ export default function InventoryScreen() {
     return () => unsub();
   }, []);
 
+  const handleEdit = (item: InventoryItem) => {
+    setEditingId(item.id);
+    setName(item.name);
+    setMinStock(item.minStockAlert?.toString() ?? '2');
+    setSelectedTeam(item.team || 'Oficina/General');
+    setActiveTab(item.category);
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setName('');
+    setMinStock('2');
+    setSelectedTeam('Oficina/General');
+  };
+
   const saveItem = async () => {
     if (name.trim() === '') {
       alert('Por favor, introduce el nombre del artículo.');
@@ -64,18 +80,26 @@ export default function InventoryScreen() {
     }
 
     try {
-      const newItem = {
-        name: name.trim(),
-        category: activeTab,
-        team: selectedTeam,
-        createdAt: new Date(),
-        ...(activeTab === 'maquinaria' ? { totalHours: 0 } : { stock: 0, minStockAlert: parsedMinStock })
-      };
-      await addDoc(collection(db, 'inventory'), newItem);
-      setName('');
-      setMinStock('2');
+      if (editingId) {
+        await updateDoc(doc(db, 'inventory', editingId), {
+          name: name.trim(),
+          category: activeTab,
+          team: selectedTeam,
+          ...(activeTab !== 'maquinaria' && { minStockAlert: parsedMinStock })
+        });
+      } else {
+        const newItem = {
+          name: name.trim(),
+          category: activeTab,
+          team: selectedTeam,
+          createdAt: new Date(),
+          ...(activeTab === 'maquinaria' ? { totalHours: 0 } : { stock: 0, minStockAlert: parsedMinStock })
+        };
+        await addDoc(collection(db, 'inventory'), newItem);
+      }
+      cancelEdit();
     } catch (error) {
-      alert('Error al añadir el artículo.');
+      alert('Error al guardar el artículo.');
     }
   };
 
@@ -131,9 +155,9 @@ export default function InventoryScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Formulario de Alta */}
+      {/* Formulario de Alta / Edición */}
       <View style={styles.formCard}>
-        <Text style={styles.formTitle}>Añadir Nuevo Artículo</Text>
+        <Text style={styles.formTitle}>{editingId ? '✏️ Editar Artículo' : 'Añadir Nuevo Artículo'}</Text>
         <View style={styles.formRow}>
           <TextInput
             style={[styles.input, { flex: 1 }]}
@@ -167,9 +191,16 @@ export default function InventoryScreen() {
           ))}
         </ScrollView>
 
-        <TouchableOpacity style={styles.buttonAdd} onPress={saveItem}>
-          <Text style={styles.buttonText}>+ Registrar en {activeTab}</Text>
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', gap: 10 }}>
+          <TouchableOpacity style={[styles.buttonAdd, { flex: 1 }]} onPress={saveItem}>
+            <Text style={styles.buttonText}>{editingId ? 'Guardar Cambios' : `+ Registrar en ${activeTab}`}</Text>
+          </TouchableOpacity>
+          {editingId && (
+            <TouchableOpacity style={[styles.buttonAdd, { flex: 1, backgroundColor: '#888' }]} onPress={cancelEdit}>
+              <Text style={styles.buttonText}>Cancelar</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
       {/* Lista de Inventario */}
@@ -212,6 +243,9 @@ export default function InventoryScreen() {
                       </TouchableOpacity>
                     </>
                   )}
+                  <TouchableOpacity style={styles.iconBtn} onPress={() => handleEdit(item)}>
+                    <Text style={{fontSize: 16}}>✏️</Text>
+                  </TouchableOpacity>
                   <TouchableOpacity style={styles.iconBtn} onPress={() => deleteItem(item.id, item.name)}>
                     <Text style={{fontSize: 16}}>🗑️</Text>
                   </TouchableOpacity>
