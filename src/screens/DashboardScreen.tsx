@@ -18,6 +18,7 @@ export default function DashboardScreen() {
   const [clients, setClients] = useState<any[]>([]);
   const [teams, setTeams] = useState<any[]>([]);
   const [expenses, setExpenses] = useState<any[]>([]);
+  const [inventory, setInventory] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Filtros globales
@@ -75,6 +76,17 @@ export default function DashboardScreen() {
       const list: any[] = [];
       snapshot.forEach(docSnap => list.push({ id: docSnap.id, ...docSnap.data() }));
       setExpenses(list);
+    });
+    return () => unsub();
+  }, []);
+
+  // 5. Cargar Inventario
+  useEffect(() => {
+    const qInv = query(collection(db, 'inventory'));
+    const unsub = onSnapshot(qInv, (snapshot) => {
+      const list: any[] = [];
+      snapshot.forEach(docSnap => list.push({ id: docSnap.id, ...docSnap.data() }));
+      setInventory(list);
     });
     return () => unsub();
   }, []);
@@ -267,6 +279,29 @@ export default function DashboardScreen() {
 
     return { totalClients, newClients };
   }, [clients, dateRange]);
+
+  // 5. CÁLCULO DE MAQUINARIA E INVENTARIO
+  const inventoryStats = useMemo(() => {
+    let machineryList: any[] = [];
+    let lowStockList: any[] = [];
+
+    inventory.forEach((item) => {
+      // Filtrar por equipo
+      const matchTeam = selectedTeam === 'Todos' ? true : (item.team || 'Oficina/General') === selectedTeam;
+      if (!matchTeam) return;
+
+      if (item.category === 'maquinaria') {
+        machineryList.push(item);
+      } else if (item.stock !== undefined && item.stock <= 2) {
+        lowStockList.push(item);
+      }
+    });
+
+    machineryList.sort((a, b) => (b.totalHours || 0) - (a.totalHours || 0));
+    lowStockList.sort((a, b) => (a.stock || 0) - (b.stock || 0));
+
+    return { machineryList, lowStockList };
+  }, [inventory, selectedTeam]);
 
   const activeTeamsList = ['Todos', 'Oficina/General', ...(teams.length > 0 ? teams.map(t => t.name) : ['Equipo 1', 'Equipo 2'])];
 
@@ -490,6 +525,49 @@ export default function DashboardScreen() {
               </View>
             </View>
           </View>
+
+          {/* SECCIÓN 5: DESGASTE DE MAQUINARIA */}
+          <View style={styles.sectionCard}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>5. 🚜 Control de Maquinaria</Text>
+            </View>
+            <Text style={styles.subSectionTitle}>Horas de uso acumuladas:</Text>
+            {inventoryStats.machineryList.length > 0 ? (
+              inventoryStats.machineryList.map((mac) => (
+                <View key={mac.id} style={styles.breakdownRow}>
+                  <View>
+                    <Text style={styles.breakdownName}>{mac.name}</Text>
+                    <Text style={{fontSize: 11, color: '#777'}}>{mac.team === 'Oficina/General' ? '🏢 General' : `🚐 ${mac.team}`}</Text>
+                  </View>
+                  <Text style={[styles.breakdownAmount, {color: '#002a54'}]}>{mac.totalHours || 0} h</Text>
+                </View>
+              ))
+            ) : (
+              <Text style={styles.emptyText}>No hay maquinaria registrada.</Text>
+            )}
+          </View>
+
+          {/* SECCIÓN 6: ALERTAS DE STOCK */}
+          <View style={[styles.sectionCard, { borderColor: '#f5c6cb' }]}>
+            <View style={[styles.sectionHeader, { borderBottomColor: '#f5c6cb' }]}>
+              <Text style={[styles.sectionTitle, { color: '#721c24' }]}>6. ⚠️ Alertas de Inventario</Text>
+            </View>
+            <Text style={[styles.subSectionTitle, { color: '#721c24' }]}>Productos próximos a agotarse:</Text>
+            {inventoryStats.lowStockList.length > 0 ? (
+              inventoryStats.lowStockList.map((item) => (
+                <View key={item.id} style={[styles.breakdownRow, { borderBottomColor: '#fdf3f4' }]}>
+                  <View>
+                    <Text style={[styles.breakdownName, { color: '#721c24' }]}>{item.name}</Text>
+                    <Text style={{fontSize: 11, color: '#d9534f'}}>{item.team === 'Oficina/General' ? '🏢 General' : `🚐 ${item.team}`}</Text>
+                  </View>
+                  <Text style={[styles.breakdownAmount, { color: '#d9534f', fontSize: 18 }]}>{item.stock || 0} u.</Text>
+                </View>
+              ))
+            ) : (
+              <Text style={styles.emptyText}>Stock en niveles óptimos. ✅</Text>
+            )}
+          </View>
+
         </View>
       )}
 
