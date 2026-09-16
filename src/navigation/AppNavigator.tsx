@@ -9,6 +9,7 @@ import ServicesScreen from '../screens/ServicesScreen';
 import RouteScreen from '../screens/RouteScreen';
 import ClientsScreen from '../screens/ClientsScreen';
 import DashboardScreen from '../screens/DashboardScreen';
+import ExpensesScreen from '../screens/ExpensesScreen';
 
 const Tab = createMaterialTopTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -91,6 +92,7 @@ function TopTabs() {
       <Tab.Screen name="Appointments" component={AppointmentsScreen} options={{ tabBarLabel: '➕ Nueva Cita' }} />
       <Tab.Screen name="Clients" component={ClientsScreen} options={{ tabBarLabel: '👥 Clientes' }} />
       <Tab.Screen name="Services" component={ServicesScreen} options={{ tabBarLabel: '🧹 Servicios' }} />
+      <Tab.Screen name="Expenses" component={ExpensesScreen} options={{ tabBarLabel: '💸 Gastos' }} />
     </Tab.Navigator>
   );
 }

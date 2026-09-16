@@ -17,6 +17,7 @@ export default function DashboardScreen() {
   const [appointments, setAppointments] = useState<any[]>([]);
   const [clients, setClients] = useState<any[]>([]);
   const [teams, setTeams] = useState<any[]>([]);
+  const [expenses, setExpenses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Filtros globales
@@ -67,6 +68,17 @@ export default function DashboardScreen() {
     return () => unsub();
   }, []);
 
+  // 4. Cargar Gastos
+  useEffect(() => {
+    const qExpenses = query(collection(db, 'expenses'));
+    const unsub = onSnapshot(qExpenses, (snapshot) => {
+      const list: any[] = [];
+      snapshot.forEach(docSnap => list.push({ id: docSnap.id, ...docSnap.data() }));
+      setExpenses(list);
+    });
+    return () => unsub();
+  }, []);
+
   // Calcular rango de fechas según el filtro seleccionado
   const dateRange = useMemo(() => {
     const now = new Date();
@@ -108,26 +120,39 @@ export default function DashboardScreen() {
     });
   }, [appointments, dateRange, selectedTeam]);
 
-  // 1. CÁLCULO DE FACTURACIÓN
+  // Gastos filtrados por Fecha (los gastos no tienen equipo asociado en este momento)
+  const filteredExpenses = useMemo(() => {
+    return expenses.filter((exp) => {
+      const expDate = exp.date;
+      if (!expDate) return false;
+      return expDate >= dateRange.start && expDate <= dateRange.end;
+    });
+  }, [expenses, dateRange]);
+
+  // 1. CÁLCULO DE FINANZAS (Facturación - Gastos = Beneficio)
   const billingStats = useMemo(() => {
-    let total = 0;
+    let totalIncome = 0;
+    let totalExpenses = 0;
     const byTeam: Record<string, number> = {};
 
     filteredAppointments.forEach((app) => {
       const price = parseFloat(app.price || '0');
       const val = isNaN(price) ? 0 : price;
-      total += val;
+      totalIncome += val;
 
       const teamName = app.team || 'Equipo 1';
       byTeam[teamName] = (byTeam[teamName] || 0) + val;
     });
 
-    const averageTicket = filteredAppointments.length > 0
-      ? Math.round(total / filteredAppointments.length)
-      : 0;
+    filteredExpenses.forEach((exp) => {
+      const amount = parseFloat(exp.amount || '0');
+      totalExpenses += isNaN(amount) ? 0 : amount;
+    });
 
-    return { total, byTeam, averageTicket };
-  }, [filteredAppointments]);
+    const netProfit = totalIncome - totalExpenses;
+
+    return { totalIncome, totalExpenses, netProfit, byTeam };
+  }, [filteredAppointments, filteredExpenses]);
 
   // 2. CÁLCULO DE ANÁLISIS DE SERVICIOS
   const servicesStats = useMemo(() => {
@@ -308,26 +333,31 @@ export default function DashboardScreen() {
         <ActivityIndicator size="large" color="#4a9b40" style={{ marginVertical: 30 }} />
       ) : (
         <View style={styles.dashboardGrid}>
-          {/* SECCIÓN 1: FACTURACIÓN */}
+          {/* SECCIÓN 1: FINANZAS */}
           <View style={styles.sectionCard}>
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>1. 💶 Facturación y Rendimiento Económico</Text>
+              <Text style={styles.sectionTitle}>1. 💶 Finanzas: Ingresos vs Gastos</Text>
             </View>
 
             <View style={styles.kpiRow}>
               <View style={[styles.kpiBox, { backgroundColor: '#eaf5ea', borderColor: '#b2dfb2' }]}>
-                <Text style={styles.kpiLabel}>Facturación Total</Text>
-                <Text style={[styles.kpiValue, { color: '#256320' }]}>{billingStats.total.toLocaleString()} €</Text>
-                <Text style={styles.kpiSub}>En el periodo</Text>
+                <Text style={styles.kpiLabel}>Ingresos Brutos</Text>
+                <Text style={[styles.kpiValue, { color: '#256320' }]}>+ {billingStats.totalIncome.toLocaleString()} €</Text>
+                <Text style={styles.kpiSub}>Facturado</Text>
               </View>
-              <View style={[styles.kpiBox, { backgroundColor: '#eef4fa', borderColor: '#cfe0f2' }]}>
-                <Text style={styles.kpiLabel}>Ticket Medio / Cita</Text>
-                <Text style={[styles.kpiValue, { color: '#002a54' }]}>{billingStats.averageTicket} €</Text>
-                <Text style={styles.kpiSub}>Promedio/servicio</Text>
+              <View style={[styles.kpiBox, { backgroundColor: '#ffe5e5', borderColor: '#ffcccc' }]}>
+                <Text style={styles.kpiLabel}>Gastos Totales</Text>
+                <Text style={[styles.kpiValue, { color: '#d9534f' }]}>- {billingStats.totalExpenses.toLocaleString()} €</Text>
+                <Text style={styles.kpiSub}>Operativos</Text>
               </View>
             </View>
+            <View style={[styles.kpiBox, { backgroundColor: '#eef4fa', borderColor: '#cfe0f2', marginBottom: 15 }]}>
+              <Text style={styles.kpiLabel}>Beneficio Neto</Text>
+              <Text style={[styles.kpiValue, { color: '#002a54', fontSize: 28 }]}>{billingStats.netProfit.toLocaleString()} €</Text>
+              <Text style={styles.kpiSub}>Ganancia real de la empresa</Text>
+            </View>
 
-            <Text style={styles.subSectionTitle}>Desglose por Equipos:</Text>
+            <Text style={styles.subSectionTitle}>Ingresos por Equipos:</Text>
             {Object.keys(billingStats.byTeam).length > 0 ? (
               Object.entries(billingStats.byTeam).map(([tName, amount]) => (
                 <View key={tName} style={styles.breakdownRow}>
