@@ -57,6 +57,11 @@ export default function RouteScreen() {
     Linking.openURL(baseUrl + encodedAddresses).catch(() => alert("No se pudo abrir el mapa."));
   };
 
+  const callClient = (phone: string | undefined) => {
+    if (!phone) return;
+    Linking.openURL(`tel:${phone}`);
+  };
+
   const teamOptions = ['Todos', ...(teams.length > 0 ? teams.map(t => t.name) : ['Equipo 1', 'Equipo 2'])];
 
   return (
@@ -101,7 +106,14 @@ export default function RouteScreen() {
                   <Text style={styles.numberText}>{index + 1}</Text>
                 </View>
                 <View style={styles.routeInfo}>
-                  <Text style={styles.time}>{item.time} - {item.client}</Text>
+                  <View style={styles.clientHeader}>
+                    <Text style={styles.time}>{item.time} - {item.client}</Text>
+                    {item.phone ? (
+                      <TouchableOpacity style={styles.phoneBadge} onPress={() => callClient(item.phone)}>
+                        <Text style={styles.phoneText}>📞 Llamar: {item.phone}</Text>
+                      </TouchableOpacity>
+                    ) : null}
+                  </View>
                   <Text style={styles.address}>📍 {item.address || 'Sin dirección'}</Text>
                   {item.detailedInfo ? (
                     <Text style={styles.detailedInfo}>🏢 {item.detailedInfo}</Text>
@@ -145,7 +157,10 @@ const styles = StyleSheet.create({
   numberCircle: { width: 35, height: 35, borderRadius: 18, backgroundColor: '#002a54', justifyContent: 'center', alignItems: 'center', marginRight: 15 },
   numberText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
   routeInfo: { flex: 1 },
-  time: { fontWeight: 'bold', color: '#002a54', fontSize: 16, marginBottom: 4 },
+  clientHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 6, marginBottom: 4 },
+  time: { fontWeight: 'bold', color: '#002a54', fontSize: 15 },
+  phoneBadge: { backgroundColor: '#eef7ee', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4, borderWidth: 1, borderColor: '#c5e6c5' },
+  phoneText: { color: '#256320', fontWeight: 'bold', fontSize: 12 },
   address: { color: '#444', fontSize: 14, marginBottom: 2 },
   detailedInfo: { color: '#8a5800', fontWeight: 'bold', fontSize: 12, marginBottom: 4, backgroundColor: '#fff8e7', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, alignSelf: 'flex-start' },
   teamBadgeText: { color: '#4a9b40', fontWeight: 'bold', fontSize: 12 },

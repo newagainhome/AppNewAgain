@@ -16,6 +16,7 @@ import { db } from '../config/firebase';
 interface Appointment {
   id: string;
   client: string;
+  phone?: string;
   date: string;
   time: string;
   serviceName: string;
@@ -209,6 +210,11 @@ export default function CalendarScreen({ navigation }: any) {
     Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`);
   };
 
+  const callClient = (phone: string | undefined) => {
+    if (!phone) return;
+    Linking.openURL(`tel:${phone}`);
+  };
+
   const deleteAppointment = async (id: string) => {
     if (window.confirm('¿Estás completamente seguro de que deseas eliminar esta cita?')) {
       try {
@@ -299,7 +305,14 @@ export default function CalendarScreen({ navigation }: any) {
                       </TouchableOpacity>
                     </View>
 
-                    <Text style={styles.client}>👤 {item.client}</Text>
+                    <View style={styles.clientRow}>
+                      <Text style={styles.client}>👤 {item.client}</Text>
+                      {item.phone ? (
+                        <TouchableOpacity style={styles.phoneBadge} onPress={() => callClient(item.phone)}>
+                          <Text style={styles.phoneText}>📞 {item.phone}</Text>
+                        </TouchableOpacity>
+                      ) : null}
+                    </View>
 
                     {item.price ? (
                       <View style={styles.priceContainer}>
@@ -530,7 +543,10 @@ const styles = StyleSheet.create({
   time: { fontWeight: 'bold', color: '#002a54', fontSize: 15 },
   service: { color: '#4a9b40', fontWeight: 'bold', fontSize: 13, marginTop: 2 },
   deleteIcon: { fontSize: 16, padding: 4 },
-  client: { fontSize: 14, color: '#333', marginBottom: 6 },
+  clientRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6, flexWrap: 'wrap', gap: 6 },
+  client: { fontSize: 14, color: '#333', fontWeight: 'bold' },
+  phoneBadge: { backgroundColor: '#eef7ee', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4, borderWidth: 1, borderColor: '#c5e6c5' },
+  phoneText: { color: '#256320', fontWeight: 'bold', fontSize: 12 },
   priceContainer: {
     backgroundColor: '#eaf5ea',
     paddingHorizontal: 8,

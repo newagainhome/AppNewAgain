@@ -16,10 +16,11 @@ import { db } from '../config/firebase';
 
 export default function AppointmentsScreen({ navigation }: any) {
   const [client, setClient] = useState('');
+  const [phone, setPhone] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [time, setTime] = useState('');
   
-  // Dirección y validación estricta
+  // Dirección y validación optimizada
   const [addressInput, setAddressInput] = useState('');
   const [validatedAddress, setValidatedAddress] = useState<string | null>(null);
   const [detailedInfo, setDetailedInfo] = useState('');
@@ -74,7 +75,7 @@ export default function AppointmentsScreen({ navigation }: any) {
     return () => unsubscribe();
   }, [date]);
 
-  // BÚSQUEDA AUTOMÁTICA Y PRECISA DE DIRECCIONES
+  // BÚSQUEDA ROBUSTA DE DIRECCIONES (Compatible con Web y CORS)
   const searchAddress = async (text: string) => {
     setAddressInput(text);
     setIsValidated(false);
@@ -87,41 +88,70 @@ export default function AppointmentsScreen({ navigation }: any) {
 
     setIsValidating(true);
     try {
-      const url = `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=5&countrycodes=es&q=${encodeURIComponent(text)}`;
-      const response = await fetch(url, {
-        headers: {
-          'Accept': 'application/json',
-          'User-Agent': 'NewAgainApp/1.0'
-        }
-      });
-      const data = await response.json();
-      if (Array.isArray(data)) {
-        setAddressSuggestions(data);
-      } else {
-        setAddressSuggestions([]);
+      // 1. Motor principal: Photon Geocoding
+      const photonUrl = `https://photon.komoot.io/api/?q=${encodeURIComponent(text)}&limit=6&lat=40.4168&lon=-3.7038`;
+      const res = await fetch(photonUrl);
+      const data = await res.json();
+      
+      if (data && data.features && data.features.length > 0) {
+        const results = data.features.map((f: any) => {
+          const p = f.properties || {};
+          const street = p.street || p.name || '';
+          const num = p.housenumber ? `, ${p.housenumber}` : '';
+          const city = p.city || p.town || p.district || p.county || 'Madrid';
+          const postcode = p.postcode ? ` (${p.postcode})` : '';
+          const state = p.state || p.country || '';
+
+          return {
+            title: `${street}${num}`.trim() || p.name,
+            subtitle: `🏛️ ${city}${postcode} · ${state}`,
+            fullFormatted: `${street}${num}, ${city}${postcode}`.trim()
+          };
+        });
+        setAddressSuggestions(results);
+        return;
+      }
+
+      // 2. Motor secundario: OpenStreetMap Nominatim
+      const nomUrl = `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=5&countrycodes=es&q=${encodeURIComponent(text)}`;
+      const nomRes = await fetch(nomUrl);
+      const nomData = await nomRes.json();
+      if (Array.isArray(nomData) && nomData.length > 0) {
+        const results = nomData.map((item: any) => {
+          const addr = item.address || {};
+          const street = addr.road || addr.pedestrian || addr.street || item.name || '';
+          const num = addr.house_number ? `, ${addr.house_number}` : '';
+          const city = addr.city || addr.town || addr.village || addr.municipality || '';
+          const postcode = addr.postcode ? ` (${addr.postcode})` : '';
+          return {
+            title: `${street}${num}`.trim() || item.display_name,
+            subtitle: `🏛️ ${city}${postcode}`,
+            fullFormatted: `${street}${num}, ${city}${postcode}`.trim()
+          };
+        });
+        setAddressSuggestions(results);
       }
     } catch (error) {
-      console.log('Error buscando dirección:', error);
+      console.log('Error buscando sugerencias:', error);
     } finally {
       setIsValidating(false);
     }
   };
 
-  const selectAddress = (item: any) => {
-    const addr = item.address || {};
-    const road = addr.road || addr.pedestrian || addr.street || addr.neighbourhood || item.name || '';
-    const houseNumber = addr.house_number ? `, ${addr.house_number}` : '';
-    const municipality = addr.city || addr.town || addr.village || addr.municipality || addr.county || '';
-    const postcode = addr.postcode ? ` (${addr.postcode})` : '';
-    const province = addr.province || addr.state || '';
+  const selectSuggestion = (item: any) => {
+    const chosen = item.fullFormatted || item.title;
+    setAddressInput(chosen);
+    setValidatedAddress(chosen);
+    setIsValidated(true);
+    setAddressSuggestions([]);
+  };
 
-    let formatted = `${road}${houseNumber}`.trim();
-    if (municipality) formatted += ` · ${municipality}${postcode}`;
-    if (province && province !== municipality) formatted += ` · ${province}`;
-    if (!formatted) formatted = item.display_name;
-
-    setAddressInput(formatted);
-    setValidatedAddress(formatted);
+  const confirmCurrentAddress = () => {
+    if (!addressInput || addressInput.trim().length < 4) {
+      alert("Introduce al menos la calle, número y población.");
+      return;
+    }
+    setValidatedAddress(addressInput.trim());
     setIsValidated(true);
     setAddressSuggestions([]);
   };
@@ -168,8 +198,9 @@ export default function AppointmentsScreen({ navigation }: any) {
   };
 
   const findOptimalSlot = async () => {
-    if (!isValidated || !addressInput || !selectedService) {
-      Alert.alert("Aviso", "Primero selecciona y valida una dirección oficial de la lista y elige un servicio.");
+    const targetAddr = validatedAddress || addressInput;
+    if (!targetAddr || targetAddr.length < 4 || !selectedService) {
+      Alert.alert("Aviso", "Primero escribe la dirección y selecciona un servicio.");
       return;
     }
 
@@ -201,7 +232,7 @@ export default function AppointmentsScreen({ navigation }: any) {
       let maxSim = 0;
 
       for (const app of appsInRange) {
-        const sim = getSimilarity(addressInput, app.address);
+        const sim = getSimilarity(targetAddr, app.address);
         if (sim > maxSim) {
           maxSim = sim;
           bestMatchApp = app;
@@ -236,12 +267,13 @@ export default function AppointmentsScreen({ navigation }: any) {
 
   const saveAppointment = async () => {
     if (!client.trim() || !date || !time || !selectedService) {
-      alert("Por favor, rellena todos los campos obligatorios (cliente, servicio, fecha y hora).");
+      alert("Por favor, rellena los campos obligatorios (cliente, servicio, fecha y hora).");
       return;
     }
 
-    if (!isValidated || !validatedAddress) {
-      alert("⚠️ Debes seleccionar una dirección validada del menú de sugerencias para asegurar la calle, el número y el municipio correctos.");
+    const finalAddress = validatedAddress || addressInput.trim();
+    if (!finalAddress) {
+      alert("Por favor, introduce una dirección.");
       return;
     }
 
@@ -255,9 +287,10 @@ export default function AppointmentsScreen({ navigation }: any) {
       const finalTeam = team || (teams[0]?.name ?? 'Equipo 1');
       await addDoc(collection(db, 'appointments'), {
         client: client.trim(),
+        phone: phone.trim(),
         date,
         time,
-        address: validatedAddress,
+        address: finalAddress,
         detailedInfo: detailedInfo.trim(),
         price: price.trim() || '',
         team: finalTeam,
@@ -266,8 +299,8 @@ export default function AppointmentsScreen({ navigation }: any) {
         createdAt: new Date()
       });
 
-      // Resetear estado
       setClient('');
+      setPhone('');
       setTime('');
       setAddressInput('');
       setValidatedAddress(null);
@@ -296,14 +329,29 @@ export default function AppointmentsScreen({ navigation }: any) {
     <ScrollView style={styles.container}>
       <Text style={styles.title}>Programar Nueva Cita</Text>
       
-      <TextInput
-        style={styles.input}
-        placeholder="Nombre del cliente"
-        value={client}
-        onChangeText={setClient}
-      />
+      {/* DATOS DEL CLIENTE */}
+      <View style={{ marginBottom: 12 }}>
+        <Text style={styles.inputLabel}>Nombre del cliente: *</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Ej: Laura García"
+          value={client}
+          onChangeText={setClient}
+        />
+      </View>
+
+      <View style={{ marginBottom: 12 }}>
+        <Text style={styles.inputLabel}>Teléfono de contacto:</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Ej: 612 345 678"
+          keyboardType="phone-pad"
+          value={phone}
+          onChangeText={setPhone}
+        />
+      </View>
       
-      {/* SECCIÓN DE DIRECCIÓN VALIDADA OBLIGATORIA */}
+      {/* SECCIÓN DE DIRECCIÓN Y VALIDACIÓN */}
       <View style={styles.addressSection}>
         <Text style={styles.inputLabel}>Dirección (Calle, Número y Municipio): *</Text>
         <View style={styles.addressInputRow}>
@@ -317,53 +365,46 @@ export default function AppointmentsScreen({ navigation }: any) {
             value={addressInput}
             onChangeText={searchAddress}
           />
+          <TouchableOpacity style={styles.validateBtn} onPress={confirmCurrentAddress}>
+            <Text style={styles.validateBtnText}>✅ Validar</Text>
+          </TouchableOpacity>
           <TouchableOpacity style={styles.mapsVerifyBtn} onPress={verifyInGoogleMaps}>
-            <Text style={styles.mapsVerifyText}>🗺️ Ver Mapa</Text>
+            <Text style={styles.mapsVerifyText}>🗺️ Ver</Text>
           </TouchableOpacity>
         </View>
 
         {isValidating && (
           <View style={styles.validatingRow}>
             <ActivityIndicator size="small" color="#002a54" />
-            <Text style={styles.validatingText}>Validando dirección con mapas oficiales...</Text>
+            <Text style={styles.validatingText}>Buscando sugerencias en mapas...</Text>
           </View>
         )}
 
         {/* Listado de sugerencias oficiales verificadas */}
         {addressSuggestions.length > 0 && (
           <View style={styles.suggestionsCard}>
-            <Text style={styles.suggestionsHeader}>📍 Toca una dirección oficial para validarla:</Text>
+            <Text style={styles.suggestionsHeader}>📍 Sugerencias encontradas (toca para autocompletar):</Text>
             {addressSuggestions.map((item, idx) => (
               <TouchableOpacity
                 key={idx}
                 style={styles.suggestionItem}
-                onPress={() => selectAddress(item)}
+                onPress={() => selectSuggestion(item)}
               >
-                <Text style={styles.suggestionItemTitle}>
-                  {item.address?.road || item.name || 'Calle'}{item.address?.house_number ? `, ${item.address.house_number}` : ''}
-                </Text>
-                <Text style={styles.suggestionItemSubtitle}>
-                  🏛️ {item.address?.city || item.address?.town || item.address?.village || item.address?.municipality || 'Municipio'} {item.address?.postcode ? `(${item.address.postcode})` : ''} · {item.address?.province || item.address?.state || ''}
-                </Text>
+                <Text style={styles.suggestionItemTitle}>{item.title}</Text>
+                <Text style={styles.suggestionItemSubtitle}>{item.subtitle}</Text>
               </TouchableOpacity>
             ))}
           </View>
         )}
 
-        {isValidated ? (
+        {isValidated && (
           <View style={styles.validatedBadge}>
-            <Text style={styles.validatedBadgeText}>✅ Dirección Oficial Validada: {validatedAddress}</Text>
+            <Text style={styles.validatedBadgeText}>✅ Dirección Confirmada: {validatedAddress}</Text>
           </View>
-        ) : (
-          addressInput.trim().length > 3 && addressSuggestions.length === 0 && !isValidating && (
-            <Text style={styles.unvalidatedWarning}>
-              ⚠️ Selecciona una de las direcciones oficiales que aparecen al escribir para asegurar el municipio y número.
-            </Text>
-          )
         )}
       </View>
 
-      {/* NUEVO CAMPO: INFORMACIÓN DETALLADA */}
+      {/* INFORMACIÓN DETALLADA */}
       <View style={{ marginBottom: 12 }}>
         <Text style={styles.inputLabel}>Información detallada (Portal, Escalera, Piso, Puerta):</Text>
         <TextInput
@@ -481,8 +522,10 @@ const styles = StyleSheet.create({
   
   // Validación de Dirección
   addressSection: { marginBottom: 12 },
-  addressInputRow: { flexDirection: 'row', gap: 8, alignItems: 'center', marginBottom: 6 },
-  mapsVerifyBtn: { backgroundColor: '#eef4fa', borderWidth: 1, borderColor: '#002a54', paddingHorizontal: 12, paddingVertical: 12, borderRadius: 8, justifyContent: 'center' },
+  addressInputRow: { flexDirection: 'row', gap: 6, alignItems: 'center', marginBottom: 6 },
+  validateBtn: { backgroundColor: '#4a9b40', paddingHorizontal: 12, paddingVertical: 12, borderRadius: 8, justifyContent: 'center' },
+  validateBtnText: { color: '#ffffff', fontWeight: 'bold', fontSize: 13 },
+  mapsVerifyBtn: { backgroundColor: '#eef4fa', borderWidth: 1, borderColor: '#002a54', paddingHorizontal: 10, paddingVertical: 12, borderRadius: 8, justifyContent: 'center' },
   mapsVerifyText: { color: '#002a54', fontWeight: 'bold', fontSize: 13 },
   validatingRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginVertical: 4 },
   validatingText: { color: '#666', fontSize: 12, fontStyle: 'italic' },
@@ -493,7 +536,6 @@ const styles = StyleSheet.create({
   suggestionItemSubtitle: { color: '#555', fontSize: 12, marginTop: 2 },
   validatedBadge: { backgroundColor: '#eaf5ea', borderWidth: 1, borderColor: '#a3d9a3', padding: 8, borderRadius: 6, marginTop: 4 },
   validatedBadgeText: { color: '#256320', fontWeight: 'bold', fontSize: 12 },
-  unvalidatedWarning: { color: '#c0392b', fontSize: 12, marginTop: 4, fontStyle: 'italic' },
 
   smartButton: { backgroundColor: '#002a54', padding: 12, borderRadius: 8, alignItems: 'center', marginBottom: 15 },
   smartButtonText: { color: '#fff', fontWeight: 'bold', fontSize: 15 },
