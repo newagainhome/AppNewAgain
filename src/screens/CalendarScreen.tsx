@@ -623,8 +623,19 @@ export default function CalendarScreen({ navigation }: any) {
   
     try {
       if (Platform.OS === 'web') {
-        // En web, printAsync abre directamente el diálogo nativo de impresión/guardar PDF
-        await Print.printAsync({ html });
+        // En web, expo-print a veces imprime la pantalla actual entera. 
+        // La forma 100% fiable es abrir una nueva pestaña e inyectar el HTML de la factura.
+        const printWindow = window.open('', '_blank');
+        if (printWindow) {
+          printWindow.document.write(html);
+          printWindow.document.close();
+          // Damos medio segundo para que carguen las fuentes de Google
+          setTimeout(() => {
+            printWindow.print();
+          }, 500);
+        } else {
+          alert('Por favor, permite las ventanas emergentes (pop-ups) en tu navegador para ver la factura.');
+        }
       } else {
         // En móviles, generamos el archivo físico y abrimos el menú de compartir
         const { uri } = await Print.printToFileAsync({ html });
