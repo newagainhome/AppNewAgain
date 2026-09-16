@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, FlatList, ActivityIndicator, Image, Linking, ScrollView } from 'react-native';
 import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy } from 'firebase/firestore';
-import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import * as ImagePicker from 'expo-image-picker';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
@@ -64,7 +64,7 @@ export default function ExpensesScreen() {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
-        quality: 0.1, // Compresión máxima para ahorrar espacio en la nube
+        quality: 0.2, // Compresión alta y segura para evitar fallos
       });
       handleImageResult(result);
     } catch (error) {
@@ -76,7 +76,7 @@ export default function ExpensesScreen() {
     try {
       const result = await ImagePicker.launchCameraAsync({
         allowsEditing: true,
-        quality: 0.1, // Compresión máxima para ahorrar espacio en la nube
+        quality: 0.2, // Compresión alta y segura para evitar fallos
       });
       handleImageResult(result);
     } catch (error) {
@@ -99,7 +99,7 @@ export default function ExpensesScreen() {
         const blob = await response.blob();
         const fileName = `tickets/${Date.now()}.jpg`;
         const storageRef = ref(storage, fileName);
-        await uploadBytesResumable(storageRef, blob);
+        await uploadBytes(storageRef, blob);
         downloadUrl = await getDownloadURL(storageRef);
       }
 
