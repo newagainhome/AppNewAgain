@@ -115,7 +115,7 @@ export default function AppNavigator() {
     <NavigationContainer>
       <Stack.Navigator
         screenOptions={{
-          headerStyle: { backgroundColor: '#002a54' },
+          headerStyle: { backgroundColor: '#0d1b2a' },
           headerTitleAlign: 'center',
           headerTitle: () => (
             <View style={{flexDirection: 'row', alignItems: 'center'}}>
@@ -123,8 +123,8 @@ export default function AppNavigator() {
             </View>
           ),
           headerRight: () => role ? (
-            <TouchableOpacity onPress={logout} style={{marginRight: 15, padding: 5}}>
-              <Text style={{color: '#fff', fontWeight: 'bold'}}>Salir 🔒</Text>
+            <TouchableOpacity onPress={logout} style={{marginRight: 15, padding: 6, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 8, borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)'}}>
+              <Text style={{color: 'rgba(255,255,255,0.7)', fontWeight: 'bold', fontSize: 13}}>Salir 🔒</Text>
             </TouchableOpacity>
           ) : null
         }}
@@ -143,13 +143,13 @@ const styles = StyleSheet.create({
   logoContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingBottom: 5 },
   logoImage: { width: 140, height: 40 },
   tabBarWrapper: {
-    backgroundColor: '#ffffff',
-    borderBottomWidth: 2,
-    borderBottomColor: '#e0e0e0',
-    elevation: 3,
+    backgroundColor: '#0d1b2a',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.08)',
+    elevation: 5,
     shadowColor: '#000',
-    shadowOpacity: 0.08,
-    shadowOffset: { width: 0, height: 2 }
+    shadowOpacity: 0.3,
+    shadowOffset: { width: 0, height: 3 }
   },
   tabScrollContent: {
     flexDirection: 'row',
@@ -158,35 +158,31 @@ const styles = StyleSheet.create({
     justifyContent: 'space-around'
   },
   tabButton: {
-    paddingVertical: 12,
+    paddingVertical: 13,
     paddingHorizontal: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    borderBottomWidth: 4,
+    borderBottomWidth: 3,
     borderBottomColor: 'transparent'
   },
   tabButtonActive: {
     borderBottomColor: '#4a9b40',
-    backgroundColor: '#f4f8fb'
   },
   tabButtonInactive: {
     borderBottomColor: 'transparent',
-    backgroundColor: '#ffffff'
   },
   tabText: {
-    color: '#002a54',
     fontWeight: 'bold',
-    fontSize: 14,
+    fontSize: 13,
     textAlign: 'center'
   },
   tabTextActive: {
-    color: '#002a54',
+    color: '#4a9b40',
     fontWeight: 'bold',
-    opacity: 1
   },
   tabTextInactive: {
-    color: '#002a54',
-    fontWeight: 'bold',
-    opacity: 0.6
+    color: 'rgba(255,255,255,0.45)',
+    fontWeight: '600',
   }
 });
+
