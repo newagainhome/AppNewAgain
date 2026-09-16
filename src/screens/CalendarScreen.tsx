@@ -25,6 +25,7 @@ interface Appointment {
   address?: string;
   detailedInfo?: string;
   team?: string;
+  reminderSent?: boolean;
 }
 
 interface Team {
@@ -40,6 +41,10 @@ export default function CalendarScreen({ navigation }: any) {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
   const [conflicts, setConflicts] = useState<Record<string, string>>({});
+  
+  // Recordatorios
+  const [pendingReminders, setPendingReminders] = useState<number>(0);
+  const [tomorrowDateStr, setTomorrowDateStr] = useState<string>('');
   
   // Modal de gestión de equipos
   const [showTeamsModal, setShowTeamsModal] = useState(false);
@@ -130,6 +135,56 @@ export default function CalendarScreen({ navigation }: any) {
 
     return () => unsubscribeApps();
   }, [selectedDate, teams]);
+
+  // 3. Chequear recordatorios pendientes para mañana
+  useEffect(() => {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tDate = tomorrow.toISOString().split('T')[0];
+    setTomorrowDateStr(tDate);
+
+    const qTomorrow = query(collection(db, 'appointments'), where('date', '==', tDate));
+    const unsubscribe = onSnapshot(qTomorrow, (snapshot) => {
+      let pending = 0;
+      snapshot.forEach(docSnap => {
+        const data = docSnap.data();
+        if (!data.reminderSent && data.phone) {
+          pending++;
+        }
+      });
+      setPendingReminders(pending);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const sendWhatsAppReminder = async (item: Appointment) => {
+    if (!item.phone) return alert('El cliente no tiene teléfono guardado.');
+    
+    const isTomorrow = item.date === tomorrowDateStr;
+    const isToday = item.date === new Date().toISOString().split('T')[0];
+    
+    let dateText = isTomorrow ? 'mañana' : (isToday ? 'hoy' : `el día ${item.date}`);
+    
+    const message = `Hola ${item.client}, te recordamos que ${dateText} tienes agendada la cita con NewAgain a las ${item.time}.`;
+    
+    let phoneNum = item.phone.replace(/\s+/g, '');
+    if (phoneNum.length === 9 && (phoneNum.startsWith('6') || phoneNum.startsWith('7') || phoneNum.startsWith('8') || phoneNum.startsWith('9'))) {
+      phoneNum = '34' + phoneNum;
+    } else if (phoneNum.startsWith('+')) {
+      phoneNum = phoneNum.substring(1);
+    }
+    
+    const url = `https://wa.me/${phoneNum}?text=${encodeURIComponent(message)}`;
+    
+    try {
+      await updateDoc(doc(db, 'appointments', item.id), {
+        reminderSent: true
+      });
+      Linking.openURL(url);
+    } catch(e) {
+      alert('Error al actualizar el estado del recordatorio.');
+    }
+  };
 
   const saveTeam = async () => {
     if (teamName.trim() === '') {
@@ -243,6 +298,21 @@ export default function CalendarScreen({ navigation }: any) {
         </View>
       </View>
 
+      {/* Alerta de recordatorios pendientes */}
+      {pendingReminders > 0 && (
+        <TouchableOpacity 
+          style={styles.reminderAlertBanner} 
+          onPress={() => {
+            setSelectedDate(tomorrowDateStr);
+            setShowCalendar(false);
+          }}
+        >
+          <Text style={styles.reminderAlertText}>
+            🔔 Tienes {pendingReminders} recordatorio(s) pendiente(s) para mañana. ¡Toca aquí para verlos!
+          </Text>
+        </TouchableOpacity>
+      )}
+
       {showCalendar && (
         <View style={styles.calendarModal}>
           <Calendar
@@ -337,6 +407,17 @@ export default function CalendarScreen({ navigation }: any) {
                           </View>
                         ) : null}
                       </View>
+                    ) : null}
+
+                    {item.phone ? (
+                      <TouchableOpacity 
+                        style={[styles.whatsappButton, item.reminderSent && styles.whatsappSentButton]} 
+                        onPress={() => sendWhatsAppReminder(item)}
+                      >
+                        <Text style={[styles.whatsappButtonText, item.reminderSent && styles.whatsappSentText]}>
+                          {item.reminderSent ? '✅ Recordatorio Enviado' : '📲 Enviar Recordatorio por WhatsApp'}
+                        </Text>
+                      </TouchableOpacity>
                     ) : null}
                   </View>
                 ))}
@@ -605,5 +686,32 @@ const styles = StyleSheet.create({
   iconBtn: { padding: 6, backgroundColor: '#fff', borderRadius: 6, borderWidth: 1, borderColor: '#ddd' },
   iconBtnText: { fontSize: 14 },
   closeModalBtn: { backgroundColor: '#002a54', padding: 12, borderRadius: 8, alignItems: 'center', marginTop: 15 },
-  closeModalBtnText: { color: '#fff', fontWeight: 'bold', fontSize: 15 }
+  closeModalBtnText: { color: '#fff', fontWeight: 'bold', fontSize: 15 },
+  
+  // Estilos WhatsApp
+  reminderAlertBanner: {
+    backgroundColor: '#fff3cd',
+    padding: 12,
+    marginHorizontal: 15,
+    marginTop: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#ffeeba',
+    alignItems: 'center'
+  },
+  reminderAlertText: { color: '#856404', fontWeight: 'bold', fontSize: 14, textAlign: 'center' },
+  whatsappButton: {
+    backgroundColor: '#25D366',
+    paddingVertical: 10,
+    borderRadius: 6,
+    alignItems: 'center',
+    marginTop: 10
+  },
+  whatsappButtonText: { color: '#fff', fontWeight: 'bold', fontSize: 14 },
+  whatsappSentButton: {
+    backgroundColor: '#f0f0f0',
+    borderWidth: 1,
+    borderColor: '#dcdcdc'
+  },
+  whatsappSentText: { color: '#555', fontWeight: 'bold' }
 });
