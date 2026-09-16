@@ -31,6 +31,10 @@ interface Appointment {
   team?: string;
   reminderSent?: boolean;
   photos?: string[];
+  status?: 'pending' | 'in_progress' | 'completed';
+  startedAt?: string;
+  completedAt?: string;
+  delayMinutes?: number;
 }
 
 interface Team {
@@ -324,6 +328,52 @@ export default function CalendarScreen({ navigation }: any) {
     }
   };
 
+  const startService = async (item: Appointment) => {
+    try {
+      const now = new Date();
+      let delayMins = 0;
+      const todayStr = now.toISOString().split('T')[0];
+      
+      // Calcular retraso solo si el servicio es en el día actual
+      if (item.date === todayStr) {
+         const [schedH, schedM] = item.time.split(':').map(Number);
+         const scheduledMins = schedH * 60 + schedM;
+         const currentMins = now.getHours() * 60 + now.getMinutes();
+         if (currentMins > scheduledMins) {
+            delayMins = currentMins - scheduledMins;
+         }
+      }
+
+      await updateDoc(doc(db, 'appointments', item.id), {
+         status: 'in_progress',
+         startedAt: now.toISOString(),
+         delayMinutes: delayMins
+      });
+      
+      // Refrescar el modal si es el que está abierto
+      if (selectedAppointment && selectedAppointment.id === item.id) {
+         setSelectedAppointment({ ...selectedAppointment, status: 'in_progress', startedAt: now.toISOString(), delayMinutes: delayMins });
+      }
+    } catch (e) {
+      alert('Error al iniciar el servicio.');
+    }
+  };
+
+  const completeService = async (item: Appointment) => {
+    try {
+      const nowStr = new Date().toISOString();
+      await updateDoc(doc(db, 'appointments', item.id), {
+         status: 'completed',
+         completedAt: nowStr
+      });
+      if (selectedAppointment && selectedAppointment.id === item.id) {
+         setSelectedAppointment({ ...selectedAppointment, status: 'completed', completedAt: nowStr });
+      }
+    } catch (e) {
+      alert('Error al completar el servicio.');
+    }
+  };
+
   return (
     <View style={styles.container}>
       {/* Barra superior de herramientas */}
@@ -378,6 +428,12 @@ export default function CalendarScreen({ navigation }: any) {
           );
           const isExpanded = !!expandedTeams[t.id];
 
+          const getCardStyle = (status?: string) => {
+            if (status === 'in_progress') return [styles.card, styles.cardInProgress];
+            if (status === 'completed') return [styles.card, styles.cardCompleted];
+            return styles.card;
+          };
+
           return (
             <View key={t.id} style={styles.teamColumn}>
               {/* Cabecera del Equipo */}
@@ -410,12 +466,15 @@ export default function CalendarScreen({ navigation }: any) {
                 {teamApps.map((item) => (
                   <TouchableOpacity 
                     key={item.id} 
-                    style={styles.card}
+                    style={getCardStyle(item.status)}
                     onPress={() => setSelectedAppointment(item)}
                   >
                     <View style={styles.cardHeader}>
                       <Text style={styles.time}>{item.time} (🕒 {item.duration}m)</Text>
-                      {conflicts[item.id] && <Text style={{fontSize: 14}}>⚠️</Text>}
+                      <View style={{ flexDirection: 'row', gap: 4 }}>
+                        {item.delayMinutes ? <Text style={styles.delayBadge}>+{item.delayMinutes}m</Text> : null}
+                        {conflicts[item.id] && <Text style={{fontSize: 14}}>⚠️</Text>}
+                      </View>
                     </View>
 
                     <Text style={styles.service}>{item.serviceName}</Text>
@@ -542,9 +601,25 @@ export default function CalendarScreen({ navigation }: any) {
                 ) : null}
               </ScrollView>
 
-              <TouchableOpacity style={styles.deleteApptBtn} onPress={() => deleteAppointment(selectedAppointment.id)}>
-                <Text style={styles.deleteApptBtnText}>🗑️ Cancelar / Eliminar Cita</Text>
-              </TouchableOpacity>
+              <View style={styles.statusActionRow}>
+                {(!selectedAppointment.status || selectedAppointment.status === 'pending') ? (
+                  <TouchableOpacity style={styles.startApptBtn} onPress={() => startService(selectedAppointment)}>
+                    <Text style={styles.startApptBtnText}>▶️ Empezar Servicio</Text>
+                  </TouchableOpacity>
+                ) : selectedAppointment.status === 'in_progress' ? (
+                  <TouchableOpacity style={styles.completeApptBtn} onPress={() => completeService(selectedAppointment)}>
+                    <Text style={styles.completeApptBtnText}>✅ Finalizar Servicio</Text>
+                  </TouchableOpacity>
+                ) : (
+                  <View style={styles.completedBadge}>
+                    <Text style={styles.completedBadgeText}>Servicio Completado ✓</Text>
+                  </View>
+                )}
+                
+                <TouchableOpacity style={styles.deleteApptIconBtn} onPress={() => deleteAppointment(selectedAppointment.id)}>
+                  <Text style={styles.deleteApptIconBtnText}>🗑️</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           )}
         </View>
@@ -852,6 +927,19 @@ const styles = StyleSheet.create({
   detailsService: { fontSize: 15, color: '#4a9b40', fontWeight: 'bold', marginTop: 4 },
   closeDetailsBtn: { backgroundColor: '#f0f0f0', width: 30, height: 30, borderRadius: 15, justifyContent: 'center', alignItems: 'center' },
   closeDetailsBtnText: { fontSize: 16, fontWeight: 'bold', color: '#555' },
-  deleteApptBtn: { marginTop: 15, backgroundColor: '#fff', borderWidth: 1, borderColor: '#d9534f', paddingVertical: 12, borderRadius: 8, alignItems: 'center' },
-  deleteApptBtnText: { color: '#d9534f', fontWeight: 'bold', fontSize: 14 }
+  
+  // Estilos de Estados
+  cardInProgress: { borderLeftColor: '#3498db', backgroundColor: '#ebf5fb' },
+  cardCompleted: { borderLeftColor: '#2ecc71', backgroundColor: '#eafaf1', opacity: 0.85 },
+  delayBadge: { backgroundColor: '#ffe5e5', color: '#d9534f', fontSize: 12, fontWeight: 'bold', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 10, overflow: 'hidden' },
+  
+  statusActionRow: { flexDirection: 'row', marginTop: 20, gap: 10 },
+  startApptBtn: { flex: 1, backgroundColor: '#3498db', paddingVertical: 14, borderRadius: 8, alignItems: 'center', elevation: 1 },
+  startApptBtnText: { color: '#fff', fontWeight: 'bold', fontSize: 15 },
+  completeApptBtn: { flex: 1, backgroundColor: '#2ecc71', paddingVertical: 14, borderRadius: 8, alignItems: 'center', elevation: 1 },
+  completeApptBtnText: { color: '#fff', fontWeight: 'bold', fontSize: 15 },
+  completedBadge: { flex: 1, backgroundColor: '#eafaf1', paddingVertical: 14, borderRadius: 8, alignItems: 'center', borderWidth: 1, borderColor: '#2ecc71' },
+  completedBadgeText: { color: '#27ae60', fontWeight: 'bold', fontSize: 15 },
+  deleteApptIconBtn: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#d9534f', width: 50, borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
+  deleteApptIconBtnText: { fontSize: 20 }
 });
