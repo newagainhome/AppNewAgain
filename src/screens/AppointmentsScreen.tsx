@@ -1,18 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView } from 'react-native';
 import { collection, addDoc, onSnapshot } from 'firebase/firestore';
+import { Calendar } from 'react-native-calendars';
 import { db } from '../config/firebase';
 
 export default function AppointmentsScreen({ navigation }: any) {
   const [client, setClient] = useState('');
-  const [date, setDate] = useState('');
+  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [time, setTime] = useState('');
   const [address, setAddress] = useState('');
   
   const [services, setServices] = useState<any[]>([]);
   const [selectedService, setSelectedService] = useState<any>(null);
 
-  // Cargar los servicios disponibles
   useEffect(() => {
     const unsubscribe = onSnapshot(collection(db, 'services'), (snapshot) => {
       const srvs: any[] = [];
@@ -30,20 +30,14 @@ export default function AppointmentsScreen({ navigation }: any) {
 
     try {
       await addDoc(collection(db, 'appointments'), {
-        client,
-        date, // YYYY-MM-DD
-        time, // HH:MM
-        address,
+        client, date, time, address,
         serviceName: selectedService.name,
         duration: selectedService.duration,
         createdAt: new Date()
       });
-      alert("Cita guardada correctamente en el calendario.");
-      // Limpiar formulario y navegar al calendario
-      setClient(''); setDate(''); setTime(''); setAddress(''); setSelectedService(null);
+      setClient(''); setTime(''); setAddress(''); setSelectedService(null);
       navigation.navigate('Calendar');
     } catch (error) {
-      console.error(error);
       alert("Error al guardar la cita.");
     }
   };
@@ -53,9 +47,18 @@ export default function AppointmentsScreen({ navigation }: any) {
       <Text style={styles.title}>Programar Nueva Cita</Text>
       
       <TextInput style={styles.input} placeholder="Nombre del cliente" value={client} onChangeText={setClient} />
-      <TextInput style={styles.input} placeholder="Fecha (ej. 2026-10-25)" value={date} onChangeText={setDate} />
+      <TextInput style={styles.input} placeholder="Dirección del domicilio (para el GPS)" value={address} onChangeText={setAddress} />
       <TextInput style={styles.input} placeholder="Hora (ej. 10:30)" value={time} onChangeText={setTime} />
-      <TextInput style={styles.input} placeholder="Dirección del domicilio" value={address} onChangeText={setAddress} />
+
+      <Text style={styles.subtitle}>Selecciona la Fecha:</Text>
+      <View style={styles.calendarContainer}>
+        <Calendar
+          onDayPress={(day: any) => setDate(day.dateString)}
+          markedDates={{ [date]: { selected: true, selectedColor: '#4a9b40' } }}
+          theme={{ todayTextColor: '#002a54', arrowColor: '#002a54' }}
+        />
+      </View>
+      <Text style={styles.selectedDateText}>📅 Fecha elegida: {date}</Text>
 
       <Text style={styles.subtitle}>Selecciona el Servicio:</Text>
       {services.map(srv => (
@@ -79,13 +82,15 @@ export default function AppointmentsScreen({ navigation }: any) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 20, backgroundColor: '#f9f9f9' },
-  title: { fontSize: 22, fontWeight: 'bold', marginBottom: 20, color: '#333' },
-  subtitle: { fontSize: 16, fontWeight: 'bold', marginTop: 10, marginBottom: 10, color: '#555' },
+  title: { fontSize: 22, fontWeight: 'bold', marginBottom: 20, color: '#002a54' },
+  subtitle: { fontSize: 16, fontWeight: 'bold', marginTop: 15, marginBottom: 10, color: '#002a54' },
   input: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#ddd', padding: 12, borderRadius: 8, marginBottom: 15 },
+  calendarContainer: { borderRadius: 8, overflow: 'hidden', borderWidth: 1, borderColor: '#ddd', marginBottom: 10 },
+  selectedDateText: { fontSize: 15, color: '#4a9b40', fontWeight: 'bold', marginBottom: 15, textAlign: 'center' },
   serviceBtn: { padding: 15, backgroundColor: '#fff', borderWidth: 1, borderColor: '#ddd', borderRadius: 8, marginBottom: 10 },
-  serviceBtnSelected: { backgroundColor: '#0066cc', borderColor: '#0066cc' },
+  serviceBtnSelected: { backgroundColor: '#002a54', borderColor: '#002a54' },
   textSelected: { color: '#fff', fontWeight: 'bold' },
   textUnselected: { color: '#333' },
-  saveButton: { backgroundColor: '#28a745', padding: 15, borderRadius: 8, alignItems: 'center', marginTop: 20, marginBottom: 40 },
+  saveButton: { backgroundColor: '#4a9b40', padding: 15, borderRadius: 8, alignItems: 'center', marginTop: 20, marginBottom: 40 },
   saveButtonText: { color: '#fff', fontWeight: 'bold', fontSize: 16 }
 });

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, FlatList, ActivityIndicator } from 'react-native';
-import { collection, addDoc, onSnapshot, query, orderBy } from 'firebase/firestore';
+import { collection, addDoc, onSnapshot, query } from 'firebase/firestore';
 import { db } from '../config/firebase';
 
 interface Service {
@@ -15,7 +15,6 @@ export default function ServicesScreen() {
   const [duration, setDuration] = useState('');
   const [loading, setLoading] = useState(true);
 
-  // Escuchar cambios en la base de datos de Firebase en tiempo real
   useEffect(() => {
     const q = query(collection(db, 'services'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -26,26 +25,19 @@ export default function ServicesScreen() {
       setServices(servicesList);
       setLoading(false);
     }, (error) => {
-      console.error("Error al obtener servicios: ", error);
+      console.error(error);
       setLoading(false);
     });
-
     return () => unsubscribe();
   }, []);
 
   const addService = async () => {
     if (name.trim() !== '' && duration.trim() !== '') {
       try {
-        await addDoc(collection(db, 'services'), {
-          name,
-          duration,
-          createdAt: new Date()
-        });
-        setName('');
-        setDuration('');
+        await addDoc(collection(db, 'services'), { name, duration, createdAt: new Date() });
+        setName(''); setDuration('');
       } catch (error) {
-        console.error("Error guardando el servicio: ", error);
-        alert("Hubo un error al guardar. Comprueba las reglas de Firebase.");
+        alert("Hubo un error al guardar.");
       }
     }
   };
@@ -54,28 +46,16 @@ export default function ServicesScreen() {
     <View style={styles.container}>
       <Text style={styles.title}>Nuevo Servicio</Text>
       
-      <TextInput 
-        style={styles.input} 
-        placeholder="Nombre (ej. Limpieza Sofá 2 plazas)" 
-        value={name} 
-        onChangeText={setName} 
-      />
-      
-      <TextInput 
-        style={styles.input} 
-        placeholder="Duración estimada (minutos, ej. 90)" 
-        keyboardType="numeric" 
-        value={duration} 
-        onChangeText={setDuration} 
-      />
+      <TextInput style={styles.input} placeholder="Nombre (ej. Limpieza Sofá)" value={name} onChangeText={setName} />
+      <TextInput style={styles.input} placeholder="Duración estimada (minutos)" keyboardType="numeric" value={duration} onChangeText={setDuration} />
       
       <TouchableOpacity style={styles.button} onPress={addService}>
         <Text style={styles.buttonText}>Añadir Servicio</Text>
       </TouchableOpacity>
 
-      <Text style={styles.titleList}>Tus Servicios Guardados (Nube)</Text>
+      <Text style={styles.titleList}>Tus Servicios Guardados</Text>
       {loading ? (
-        <ActivityIndicator size="large" color="#0066cc" />
+        <ActivityIndicator size="large" color="#4a9b40" />
       ) : (
         <FlatList
           data={services}
@@ -95,13 +75,13 @@ export default function ServicesScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 20, backgroundColor: '#f9f9f9' },
-  title: { fontSize: 18, fontWeight: 'bold', marginBottom: 15, color: '#333' },
-  titleList: { fontSize: 18, fontWeight: 'bold', marginTop: 30, marginBottom: 15, color: '#333' },
+  title: { fontSize: 18, fontWeight: 'bold', marginBottom: 15, color: '#002a54' },
+  titleList: { fontSize: 18, fontWeight: 'bold', marginTop: 30, marginBottom: 15, color: '#002a54' },
   input: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#ddd', padding: 12, borderRadius: 8, marginBottom: 15 },
-  button: { backgroundColor: '#0066cc', padding: 15, borderRadius: 8, alignItems: 'center' },
+  button: { backgroundColor: '#4a9b40', padding: 15, borderRadius: 8, alignItems: 'center' }, // Verde logo
   buttonText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
-  serviceCard: { backgroundColor: '#fff', padding: 15, borderRadius: 8, marginBottom: 10, flexDirection: 'row', justifyContent: 'space-between', elevation: 1, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 3, shadowOffset: { width: 0, height: 1 } },
-  serviceName: { fontSize: 16, fontWeight: '500', color: '#444' },
-  serviceDuration: { color: '#888', fontWeight: 'bold' },
+  serviceCard: { backgroundColor: '#fff', padding: 15, borderRadius: 8, marginBottom: 10, flexDirection: 'row', justifyContent: 'space-between', elevation: 1 },
+  serviceName: { fontSize: 16, fontWeight: 'bold', color: '#002a54' }, // Azul logo
+  serviceDuration: { color: '#4a9b40', fontWeight: 'bold' },
   empty: { color: '#888', fontStyle: 'italic', textAlign: 'center', marginTop: 20 }
 });
