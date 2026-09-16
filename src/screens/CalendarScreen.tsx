@@ -307,20 +307,16 @@ export default function CalendarScreen({ route, navigation }: any) {
         });
         
         if (!hasOverlap) {
-          // Detectamos que el targetTeam podría coger esta cita.
-          // En un sistema real, aquí calcularíamos si targetTeam tiene una cita previa CERCANA geográficamente.
-          // Para esta demostración, si podemos reasignarla para balancear carga o evitar cruces geográficos (mock):
-          if (targetTeamApps.length > 0) {
-            const savings = Math.floor(Math.random() * 20) + 15; // Mock de ahorro 15-35 min
-            suggestions.push({
-              appId: sourceApp.id,
-              clientName: sourceApp.client,
-              time: sourceApp.time,
-              fromTeam: sourceTeam,
-              toTeam: targetTeam,
-              savings: savings
-            });
-          }
+          // Para esta demostración, si podemos reasignarla para balancear carga o evitar cruces geográficos:
+          const savings = Math.floor(Math.random() * 20) + 15; // Mock de ahorro 15-35 min
+          suggestions.push({
+            appId: sourceApp.id,
+            clientName: sourceApp.client,
+            time: sourceApp.time,
+            fromTeam: sourceTeam,
+            toTeam: targetTeam,
+            savings: savings
+          });
         }
       });
     });
