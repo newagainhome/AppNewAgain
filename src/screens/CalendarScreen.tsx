@@ -51,6 +51,7 @@ export default function CalendarScreen({ navigation }: any) {
   const [pendingReminders, setPendingReminders] = useState<number>(0);
   const [tomorrowDateStr, setTomorrowDateStr] = useState<string>('');
   const [uploadingPhotos, setUploadingPhotos] = useState<Record<string, boolean>>({});
+  const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
   
   // Modal de gestión de equipos
   const [showTeamsModal, setShowTeamsModal] = useState(false);
@@ -316,6 +317,7 @@ export default function CalendarScreen({ navigation }: any) {
     if (window.confirm('¿Estás completamente seguro de que deseas eliminar esta cita?')) {
       try {
         await deleteDoc(doc(db, 'appointments', id));
+        setSelectedAppointment(null);
       } catch (error) {
         alert('Hubo un error al intentar eliminar la cita.');
       }
@@ -406,87 +408,26 @@ export default function CalendarScreen({ navigation }: any) {
               {/* Lista de citas de este equipo */}
               <ScrollView style={styles.columnBody} showsVerticalScrollIndicator={false}>
                 {teamApps.map((item) => (
-                  <View key={item.id} style={styles.card}>
+                  <TouchableOpacity 
+                    key={item.id} 
+                    style={styles.card}
+                    onPress={() => setSelectedAppointment(item)}
+                  >
                     <View style={styles.cardHeader}>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.time}>{item.time} (🕒 {item.duration}m)</Text>
-                        <Text style={styles.service}>{item.serviceName}</Text>
-                      </View>
-                      <TouchableOpacity onPress={() => deleteAppointment(item.id)}>
-                        <Text style={styles.deleteIcon}>🗑️</Text>
-                      </TouchableOpacity>
+                      <Text style={styles.time}>{item.time} (🕒 {item.duration}m)</Text>
+                      {conflicts[item.id] && <Text style={{fontSize: 14}}>⚠️</Text>}
                     </View>
 
-                    <View style={styles.clientRow}>
-                      <Text style={styles.client}>👤 {item.client}</Text>
-                      {item.phone ? (
-                        <TouchableOpacity style={styles.phoneBadge} onPress={() => callClient(item.phone)}>
-                          <Text style={styles.phoneText}>📞 {item.phone}</Text>
-                        </TouchableOpacity>
-                      ) : null}
+                    <Text style={styles.service}>{item.serviceName}</Text>
+                    <Text style={styles.client}>👤 {item.client}</Text>
+
+                    <View style={styles.cardMiniIndicators}>
+                      {item.price ? <Text style={styles.miniIcon}>💶</Text> : null}
+                      {item.phone ? <Text style={styles.miniIcon}>📞</Text> : null}
+                      {item.address ? <Text style={styles.miniIcon}>📍</Text> : null}
+                      {item.photos && item.photos.length > 0 ? <Text style={styles.miniIcon}>📸</Text> : null}
                     </View>
-
-                    {item.price ? (
-                      <View style={styles.priceContainer}>
-                        <Text style={styles.priceText}>💶 Presupuesto: {item.price} €</Text>
-                      </View>
-                    ) : null}
-
-                    {conflicts[item.id] && (
-                      <View style={styles.conflictBanner}>
-                        <Text style={styles.conflictText}>{conflicts[item.id]}</Text>
-                      </View>
-                    )}
-
-                    {item.address ? (
-                      <View style={{ marginTop: 4 }}>
-                        <TouchableOpacity style={styles.mapButton} onPress={() => openMaps(item.address)}>
-                          <Text style={styles.mapButtonText} numberOfLines={2}>📍 {item.address}</Text>
-                        </TouchableOpacity>
-                        {item.detailedInfo ? (
-                          <View style={styles.detailedInfoBox}>
-                            <Text style={styles.detailedInfoText}>🏢 {item.detailedInfo}</Text>
-                          </View>
-                        ) : null}
-                      </View>
-                    ) : null}
-
-                    {/* SECCIÓN DE FOTOS ANTES/DESPUÉS */}
-                    <View style={styles.photosSection}>
-                      <Text style={styles.photosTitle}>📸 Fotografías (Antes/Después):</Text>
-                      <View style={styles.photosRow}>
-                        {item.photos && item.photos.map((photoUrl, idx) => (
-                          <TouchableOpacity key={idx} onPress={() => Linking.openURL(photoUrl)}>
-                            <Image source={{ uri: photoUrl }} style={styles.thumbnailImg} />
-                          </TouchableOpacity>
-                        ))}
-                        
-                        {uploadingPhotos[item.id] ? (
-                          <View style={styles.uploadingBox}>
-                            <ActivityIndicator size="small" color="#4a9b40" />
-                          </View>
-                        ) : (
-                          <TouchableOpacity 
-                            style={styles.addPhotoBtn} 
-                            onPress={() => pickAndUploadImage(item.id)}
-                          >
-                            <Text style={styles.addPhotoBtnText}>+</Text>
-                          </TouchableOpacity>
-                        )}
-                      </View>
-                    </View>
-
-                    {item.phone ? (
-                      <TouchableOpacity 
-                        style={[styles.whatsappButton, item.reminderSent && styles.whatsappSentButton]} 
-                        onPress={() => sendWhatsAppReminder(item)}
-                      >
-                        <Text style={[styles.whatsappButtonText, item.reminderSent && styles.whatsappSentText]}>
-                          {item.reminderSent ? '✅ Recordatorio Enviado' : '📲 Enviar Recordatorio por WhatsApp'}
-                        </Text>
-                      </TouchableOpacity>
-                    ) : null}
-                  </View>
+                  </TouchableOpacity>
                 ))}
 
                 {teamApps.length === 0 && (
@@ -500,7 +441,101 @@ export default function CalendarScreen({ navigation }: any) {
         })}
       </ScrollView>
 
-      {/* MODAL PARA GESTIONAR EQUIPOS, MIEMBROS, VEHÍCULOS Y HERRAMIENTAS */}
+      {/* MODAL DE DETALLES DEL SERVICIO */}
+      <Modal visible={!!selectedAppointment} animationType="slide" transparent={true}>
+        <View style={styles.modalOverlay}>
+          {selectedAppointment && (
+            <View style={styles.detailsModalCard}>
+              <View style={styles.detailsHeader}>
+                <View>
+                  <Text style={styles.detailsTime}>{selectedAppointment.time} (🕒 {selectedAppointment.duration}m)</Text>
+                  <Text style={styles.detailsService}>{selectedAppointment.serviceName}</Text>
+                </View>
+                <TouchableOpacity onPress={() => setSelectedAppointment(null)} style={styles.closeDetailsBtn}>
+                  <Text style={styles.closeDetailsBtnText}>✕</Text>
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView style={{ maxHeight: 500 }} showsVerticalScrollIndicator={false}>
+                <View style={styles.clientRow}>
+                  <Text style={styles.client}>👤 {selectedAppointment.client}</Text>
+                  {selectedAppointment.phone ? (
+                    <TouchableOpacity style={styles.phoneBadge} onPress={() => callClient(selectedAppointment.phone)}>
+                      <Text style={styles.phoneText}>📞 Llámar</Text>
+                    </TouchableOpacity>
+                  ) : null}
+                </View>
+
+                {selectedAppointment.price ? (
+                  <View style={styles.priceContainer}>
+                    <Text style={styles.priceText}>💶 Presupuesto: {selectedAppointment.price} €</Text>
+                  </View>
+                ) : null}
+
+                {conflicts[selectedAppointment.id] && (
+                  <View style={styles.conflictBanner}>
+                    <Text style={styles.conflictText}>{conflicts[selectedAppointment.id]}</Text>
+                  </View>
+                )}
+
+                {selectedAppointment.address ? (
+                  <View style={{ marginTop: 10 }}>
+                    <TouchableOpacity style={styles.mapButton} onPress={() => openMaps(selectedAppointment.address)}>
+                      <Text style={styles.mapButtonText}>📍 {selectedAppointment.address}</Text>
+                    </TouchableOpacity>
+                    {selectedAppointment.detailedInfo ? (
+                      <View style={styles.detailedInfoBox}>
+                        <Text style={styles.detailedInfoText}>🏢 {selectedAppointment.detailedInfo}</Text>
+                      </View>
+                    ) : null}
+                  </View>
+                ) : null}
+
+                <View style={styles.photosSection}>
+                  <Text style={styles.photosTitle}>📸 Fotografías (Antes/Después):</Text>
+                  <View style={styles.photosRow}>
+                    {selectedAppointment.photos && selectedAppointment.photos.map((photoUrl, idx) => (
+                      <TouchableOpacity key={idx} onPress={() => Linking.openURL(photoUrl)}>
+                        <Image source={{ uri: photoUrl }} style={styles.thumbnailImg} />
+                      </TouchableOpacity>
+                    ))}
+                    
+                    {uploadingPhotos[selectedAppointment.id] ? (
+                      <View style={styles.uploadingBox}>
+                        <ActivityIndicator size="small" color="#4a9b40" />
+                      </View>
+                    ) : (
+                      <TouchableOpacity 
+                        style={styles.addPhotoBtn} 
+                        onPress={() => pickAndUploadImage(selectedAppointment.id)}
+                      >
+                        <Text style={styles.addPhotoBtnText}>+</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                </View>
+
+                {selectedAppointment.phone ? (
+                  <TouchableOpacity 
+                    style={[styles.whatsappButton, selectedAppointment.reminderSent && styles.whatsappSentButton]} 
+                    onPress={() => sendWhatsAppReminder(selectedAppointment)}
+                  >
+                    <Text style={[styles.whatsappButtonText, selectedAppointment.reminderSent && styles.whatsappSentText]}>
+                      {selectedAppointment.reminderSent ? '✅ Recordatorio Enviado' : '📲 Enviar WhatsApp'}
+                    </Text>
+                  </TouchableOpacity>
+                ) : null}
+              </ScrollView>
+
+              <TouchableOpacity style={styles.deleteApptBtn} onPress={() => deleteAppointment(selectedAppointment.id)}>
+                <Text style={styles.deleteApptBtnText}>🗑️ Cancelar / Eliminar Cita</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+      </Modal>
+
+      {/* MODAL PARA GESTIONAR EQUIPOS */}
       <Modal visible={showTeamsModal} animationType="slide" transparent={true}>
         <View style={styles.modalOverlay}>
           <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', alignItems: 'center' }}>
@@ -789,5 +824,17 @@ const styles = StyleSheet.create({
   thumbnailImg: { width: 60, height: 60, borderRadius: 8, borderWidth: 1, borderColor: '#ddd' },
   uploadingBox: { width: 60, height: 60, borderRadius: 8, backgroundColor: '#f0f0f0', justifyContent: 'center', alignItems: 'center' },
   addPhotoBtn: { width: 60, height: 60, borderRadius: 8, backgroundColor: '#eef7ee', borderWidth: 1, borderColor: '#c5e6c5', justifyContent: 'center', alignItems: 'center', borderStyle: 'dashed' },
-  addPhotoBtnText: { fontSize: 24, color: '#4a9b40' }
+  addPhotoBtnText: { fontSize: 24, color: '#4a9b40' },
+
+  // Estilos del nuevo Modal de Detalles
+  cardMiniIndicators: { flexDirection: 'row', gap: 5, marginTop: 8 },
+  miniIcon: { fontSize: 13, backgroundColor: '#f0f4f8', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, overflow: 'hidden' },
+  detailsModalCard: { width: '100%', maxWidth: 450, backgroundColor: '#fff', borderRadius: 12, padding: 20, elevation: 5 },
+  detailsHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 15, borderBottomWidth: 1, borderBottomColor: '#eee', paddingBottom: 10 },
+  detailsTime: { fontSize: 18, fontWeight: 'bold', color: '#002a54' },
+  detailsService: { fontSize: 15, color: '#4a9b40', fontWeight: 'bold', marginTop: 4 },
+  closeDetailsBtn: { backgroundColor: '#f0f0f0', width: 30, height: 30, borderRadius: 15, justifyContent: 'center', alignItems: 'center' },
+  closeDetailsBtnText: { fontSize: 16, fontWeight: 'bold', color: '#555' },
+  deleteApptBtn: { marginTop: 15, backgroundColor: '#fff', borderWidth: 1, borderColor: '#d9534f', paddingVertical: 12, borderRadius: 8, alignItems: 'center' },
+  deleteApptBtnText: { color: '#d9534f', fontWeight: 'bold', fontSize: 14 }
 });
