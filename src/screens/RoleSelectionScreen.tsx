@@ -40,7 +40,7 @@ export default function RoleSelectionScreen() {
     <View style={styles.container}>
       <View style={styles.card}>
         <View style={styles.logoContainer}>
-          <Image source={require('../../assets/logo.png')} style={styles.logo} resizeMode="contain" />
+          <Image source={require('../../assets/logo.jpg')} style={styles.logo} resizeMode="contain" />
           <Text style={styles.title}>Selecciona tu Perfil</Text>
         </View>
 
