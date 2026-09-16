@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, ActivityIndicator, Image } from 'react-native';
-import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
+import { collection, doc, onSnapshot, query, orderBy } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { useAppContext } from '../context/AppContext';
 
@@ -13,22 +13,42 @@ export default function RoleSelectionScreen() {
   const [pin, setPin] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
 
-  // Default admin PIN
-  const ADMIN_PIN = '1234';
+  // Configuración de Seguridad
+  const [adminConfig, setAdminConfig] = useState({ pinEnabled: true, pin: '1234' });
 
   useEffect(() => {
+    // Escuchar equipos
     const q = query(collection(db, 'teams'), orderBy('name'));
-    const unsub = onSnapshot(q, (snapshot) => {
+    const unsubTeams = onSnapshot(q, (snapshot) => {
       const list: any[] = [];
       snapshot.forEach(docSnap => list.push({ id: docSnap.id, ...docSnap.data() }));
       setTeams(list);
       setLoading(false);
     });
-    return () => unsub();
+
+    // Escuchar configuración de administrador
+    const unsubConfig = onSnapshot(doc(db, 'config', 'admin'), (docSnap) => {
+      if (docSnap.exists()) {
+        setAdminConfig(docSnap.data() as any);
+      }
+    });
+
+    return () => {
+      unsubTeams();
+      unsubConfig();
+    };
   }, []);
 
+  const handleAdminPress = () => {
+    if (adminConfig.pinEnabled) {
+      setShowPinInput(true);
+    } else {
+      loginAsAdmin();
+    }
+  };
+
   const handleAdminSubmit = () => {
-    if (pin === ADMIN_PIN) {
+    if (pin === adminConfig.pin) {
       loginAsAdmin();
     } else {
       setErrorMsg('PIN incorrecto. Inténtalo de nuevo.');
@@ -71,7 +91,7 @@ export default function RoleSelectionScreen() {
           </View>
         ) : (
           <View style={styles.rolesSection}>
-            <TouchableOpacity style={styles.adminBtn} onPress={() => setShowPinInput(true)}>
+            <TouchableOpacity style={styles.adminBtn} onPress={handleAdminPress}>
               <Text style={styles.btnText}>👑 Administrador</Text>
             </TouchableOpacity>
 

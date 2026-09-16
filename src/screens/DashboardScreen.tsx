@@ -21,6 +21,11 @@ export default function DashboardScreen() {
   const [inventory, setInventory] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Configuración de Seguridad
+  const [adminConfig, setAdminConfig] = useState({ pinEnabled: true, pin: '1234' });
+  const [editingPinEnabled, setEditingPinEnabled] = useState(true);
+  const [editingPin, setEditingPin] = useState('1234');
+
   // Filtros globales
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('mes');
   const [selectedTeam, setSelectedTeam] = useState('Todos');
@@ -87,6 +92,20 @@ export default function DashboardScreen() {
       const list: any[] = [];
       snapshot.forEach(docSnap => list.push({ id: docSnap.id, ...docSnap.data() }));
       setInventory(list);
+    });
+    return () => unsub();
+  }, []);
+
+  // 6. Cargar Configuración Admin
+  useEffect(() => {
+    const { doc } = require('firebase/firestore');
+    const unsub = onSnapshot(doc(db, 'config', 'admin'), (docSnap: any) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setAdminConfig({ pinEnabled: data.pinEnabled, pin: data.pin });
+        setEditingPinEnabled(data.pinEnabled);
+        setEditingPin(data.pin);
+      }
     });
     return () => unsub();
   }, []);
@@ -307,6 +326,20 @@ export default function DashboardScreen() {
   }, [inventory, selectedTeam]);
 
   const activeTeamsList = ['Todos', 'Oficina/General', ...(teams.length > 0 ? teams.map(t => t.name) : ['Equipo 1', 'Equipo 2'])];
+
+  const saveAdminConfig = async () => {
+    try {
+      const { doc, setDoc } = require('firebase/firestore');
+      await setDoc(doc(db, 'config', 'admin'), {
+        pinEnabled: editingPinEnabled,
+        pin: editingPin
+      });
+      alert('✅ Configuración de seguridad guardada.');
+    } catch (error) {
+      console.error(error);
+      alert('Error al guardar la configuración.');
+    }
+  };
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
@@ -571,6 +604,41 @@ export default function DashboardScreen() {
             )}
           </View>
 
+          {/* SECCIÓN 7: CONFIGURACIÓN DE SEGURIDAD */}
+          <View style={styles.sectionCard}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>7. ⚙️ Seguridad y Acceso</Text>
+            </View>
+            <View style={{ gap: 15, paddingVertical: 10 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Text style={styles.kpiLabel}>Requerir PIN para Administrador</Text>
+                <TouchableOpacity 
+                  style={[styles.toggleBtn, editingPinEnabled ? styles.toggleOn : styles.toggleOff]} 
+                  onPress={() => setEditingPinEnabled(!editingPinEnabled)}
+                >
+                  <Text style={styles.toggleText}>{editingPinEnabled ? 'ACTIVADO' : 'DESACTIVADO'}</Text>
+                </TouchableOpacity>
+              </View>
+
+              {editingPinEnabled && (
+                <View style={{ marginTop: 10 }}>
+                  <Text style={styles.dateInputLabel}>Nuevo PIN (4 dígitos):</Text>
+                  <TextInput
+                    style={styles.dateInput}
+                    keyboardType="numeric"
+                    maxLength={4}
+                    value={editingPin}
+                    onChangeText={setEditingPin}
+                  />
+                </View>
+              )}
+
+              <TouchableOpacity style={styles.saveBtn} onPress={saveAdminConfig}>
+                <Text style={styles.saveBtnText}>Guardar Configuración</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
         </View>
       )}
 
@@ -696,5 +764,11 @@ const styles = StyleSheet.create({
   efficiencyLabel: { fontSize: 14, fontWeight: 'bold', color: '#002a54' },
   efficiencySub: { fontSize: 11, color: '#666', textAlign: 'center', marginTop: 4 },
 
-  emptyText: { color: '#888', fontStyle: 'italic', fontSize: 13, textAlign: 'center', marginVertical: 10 }
+  emptyText: { color: '#888', fontStyle: 'italic', fontSize: 13, textAlign: 'center', marginVertical: 10 },
+  toggleBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 15, borderWidth: 1 },
+  toggleOn: { backgroundColor: '#eaf5ea', borderColor: '#4a9b40' },
+  toggleOff: { backgroundColor: '#ffe5e5', borderColor: '#d9534f' },
+  toggleText: { fontSize: 12, fontWeight: 'bold', color: '#333' },
+  saveBtn: { backgroundColor: '#002a54', padding: 12, borderRadius: 8, alignItems: 'center', marginTop: 10 },
+  saveBtnText: { color: '#fff', fontWeight: 'bold', fontSize: 15 }
 });
