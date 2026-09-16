@@ -84,6 +84,14 @@ export default function CalendarScreen({ route, navigation }: any) {
   const [expandedTeams, setExpandedTeams] = useState<Record<string, boolean>>({});
   const [showCalendar, setShowCalendar] = useState(false);
 
+  // Vista Mensual
+  const [calendarView, setCalendarView] = useState<'day' | 'month'>('day');
+  const [currentMonth, setCurrentMonth] = useState(() => {
+    const now = new Date();
+    return { year: now.getFullYear(), month: now.getMonth() }; // 0-indexed
+  });
+  const [monthAppointments, setMonthAppointments] = useState<Appointment[]>([]);
+
   const getMinutes = (timeStr: string) => {
     const [h, m] = timeStr.split(':').map(Number);
     return h * 60 + m;
@@ -161,6 +169,24 @@ export default function CalendarScreen({ route, navigation }: any) {
 
     return () => unsubscribeApps();
   }, [selectedDate, teams]);
+
+  // 3. Cargar TODAS las citas del mes (para la Vista Mensual)
+  useEffect(() => {
+    const startStr = `${currentMonth.year}-${String(currentMonth.month + 1).padStart(2, '0')}-01`;
+    const lastDay = new Date(currentMonth.year, currentMonth.month + 1, 0).getDate();
+    const endStr = `${currentMonth.year}-${String(currentMonth.month + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+    const qMonth = query(
+      collection(db, 'appointments'),
+      where('date', '>=', startStr),
+      where('date', '<=', endStr)
+    );
+    const unsub = onSnapshot(qMonth, (snapshot) => {
+      const list: Appointment[] = [];
+      snapshot.forEach(d => list.push({ id: d.id, ...d.data() } as Appointment));
+      setMonthAppointments(list);
+    });
+    return () => unsub();
+  }, [currentMonth]);
 
   // 3. Chequear recordatorios pendientes para mañana
   useEffect(() => {
@@ -763,9 +789,25 @@ export default function CalendarScreen({ route, navigation }: any) {
           </TouchableOpacity>
         </View>
         <View style={styles.headerControls}>
+          {/* Toggle Vista */}
+          <View style={styles.viewToggle}>
+            <TouchableOpacity
+              style={[styles.viewToggleBtn, calendarView === 'day' && styles.viewToggleBtnActive]}
+              onPress={() => setCalendarView('day')}
+            >
+              <Text style={[styles.viewToggleText, calendarView === 'day' && styles.viewToggleTextActive]}>📋 Día</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.viewToggleBtn, calendarView === 'month' && styles.viewToggleBtnActive]}
+              onPress={() => setCalendarView('month')}
+            >
+              <Text style={[styles.viewToggleText, calendarView === 'month' && styles.viewToggleTextActive]}>🗓️ Mes</Text>
+            </TouchableOpacity>
+          </View>
+
           {isAdmin && (
             <TouchableOpacity style={styles.optimizerBtn} onPress={analyzeRoutes}>
-              <Text style={styles.optimizerBtnText}>🪄 Optimizar Rutas</Text>
+              <Text style={styles.optimizerBtnText}>🪄 Optimizar</Text>
             </TouchableOpacity>
           )}
           {isAdmin && (
@@ -778,6 +820,114 @@ export default function CalendarScreen({ route, navigation }: any) {
           </TouchableOpacity>
         </View>
       </View>
+
+      {/* ===== VISTA MENSUAL ===== */}
+      {calendarView === 'month' && (() => {
+        const DAYS = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
+        const MONTH_NAMES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+        const firstDay = new Date(currentMonth.year, currentMonth.month, 1);
+        const daysInMonth = new Date(currentMonth.year, currentMonth.month + 1, 0).getDate();
+        // offset: lunes=0
+        let startOffset = firstDay.getDay() - 1;
+        if (startOffset < 0) startOffset = 6;
+
+        const goToPrevMonth = () => setCurrentMonth(prev => {
+          const d = new Date(prev.year, prev.month - 1, 1);
+          return { year: d.getFullYear(), month: d.getMonth() };
+        });
+        const goToNextMonth = () => setCurrentMonth(prev => {
+          const d = new Date(prev.year, prev.month + 1, 1);
+          return { year: d.getFullYear(), month: d.getMonth() };
+        });
+
+        const today = new Date().toISOString().split('T')[0];
+
+        // Colores de punto por estado
+        const STATUS_COLOR: Record<string, string> = { pending: '#f39c12', in_progress: '#3498db', completed: '#4a9b40' };
+
+        const cells: (number | null)[] = [...Array(startOffset).fill(null), ...Array.from({ length: daysInMonth }, (_, i) => i + 1)];
+        while (cells.length % 7 !== 0) cells.push(null);
+
+        return (
+          <ScrollView style={{ flex: 1, padding: 12 }}>
+            {/* Navegación de mes */}
+            <View style={styles.monthNav}>
+              <TouchableOpacity onPress={goToPrevMonth} style={styles.monthNavBtn}>
+                <Text style={styles.monthNavArrow}>‹</Text>
+              </TouchableOpacity>
+              <Text style={styles.monthNavTitle}>{MONTH_NAMES[currentMonth.month]} {currentMonth.year}</Text>
+              <TouchableOpacity onPress={goToNextMonth} style={styles.monthNavBtn}>
+                <Text style={styles.monthNavArrow}>›</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Cabecera días semana */}
+            <View style={styles.monthWeekHeader}>
+              {DAYS.map(d => (
+                <Text key={d} style={styles.monthWeekDay}>{d}</Text>
+              ))}
+            </View>
+
+            {/* Grid de días */}
+            <View style={styles.monthGrid}>
+              {cells.map((day, idx) => {
+                if (!day) return <View key={`empty-${idx}`} style={styles.monthCell} />;
+                const dateStr = `${currentMonth.year}-${String(currentMonth.month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                const dayApps = monthAppointments.filter(a => a.date === dateStr);
+                const isToday = dateStr === today;
+                const isSelected = dateStr === selectedDate;
+                return (
+                  <TouchableOpacity
+                    key={dateStr}
+                    style={[styles.monthCell, isSelected && styles.monthCellSelected, isToday && !isSelected && styles.monthCellToday]}
+                    onPress={() => {
+                      setSelectedDate(dateStr);
+                      setCalendarView('day');
+                    }}
+                  >
+                    <Text style={[styles.monthDayNum, isSelected && styles.monthDayNumSelected, isToday && !isSelected && styles.monthDayNumToday]}>
+                      {day}
+                    </Text>
+                    {/* Puntos de citas */}
+                    <View style={styles.monthDots}>
+                      {dayApps.slice(0, 3).map((a, i) => (
+                        <View key={i} style={[styles.monthDot, { backgroundColor: STATUS_COLOR[a.status || 'pending'] }]} />
+                      ))}
+                      {dayApps.length > 3 && <Text style={styles.monthDotMore}>+{dayApps.length - 3}</Text>}
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {/* Leyenda */}
+            <View style={styles.monthLegend}>
+              <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: '#f39c12' }]} /><Text style={styles.legendText}>Pendiente</Text></View>
+              <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: '#3498db' }]} /><Text style={styles.legendText}>En curso</Text></View>
+              <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: '#4a9b40' }]} /><Text style={styles.legendText}>Completado</Text></View>
+            </View>
+
+            {/* Resumen del mes */}
+            <View style={styles.monthSummary}>
+              <Text style={styles.monthSummaryTitle}>📊 Resumen de {MONTH_NAMES[currentMonth.month]}</Text>
+              <View style={styles.monthSummaryRow}>
+                <View style={styles.monthSummaryKpi}>
+                  <Text style={styles.monthSummaryNum}>{monthAppointments.length}</Text>
+                  <Text style={styles.monthSummaryLabel}>Total citas</Text>
+                </View>
+                <View style={styles.monthSummaryKpi}>
+                  <Text style={[styles.monthSummaryNum, { color: '#4a9b40' }]}>{monthAppointments.filter(a => a.status === 'completed').length}</Text>
+                  <Text style={styles.monthSummaryLabel}>Completadas</Text>
+                </View>
+                <View style={styles.monthSummaryKpi}>
+                  <Text style={[styles.monthSummaryNum, { color: '#f39c12' }]}>{monthAppointments.filter(a => !a.status || a.status === 'pending').length}</Text>
+                  <Text style={styles.monthSummaryLabel}>Pendientes</Text>
+                </View>
+              </View>
+            </View>
+          </ScrollView>
+        );
+      })()}
 
       {/* Alerta de recordatorios pendientes */}
       {pendingReminders > 0 && (
@@ -1415,5 +1565,40 @@ const styles = StyleSheet.create({
   
   // Estilo para el botón de Factura PDF
   invoiceBtn: { backgroundColor: '#fdf7e3', paddingVertical: 12, borderRadius: 8, alignItems: 'center', marginTop: 15, borderWidth: 1, borderColor: '#fde68a' },
-  invoiceBtnText: { color: '#b45309', fontWeight: 'bold', fontSize: 14 }
+  invoiceBtnText: { color: '#b45309', fontWeight: 'bold', fontSize: 14 },
+
+  // Toggle de vista Día / Mes
+  viewToggle: { flexDirection: 'row', backgroundColor: '#eef4fa', borderRadius: 8, borderWidth: 1, borderColor: '#cfe0f2', overflow: 'hidden' },
+  viewToggleBtn: { paddingHorizontal: 12, paddingVertical: 7 },
+  viewToggleBtnActive: { backgroundColor: '#002a54' },
+  viewToggleText: { fontSize: 13, fontWeight: 'bold', color: '#002a54' },
+  viewToggleTextActive: { color: '#fff' },
+
+  // Vista Mensual
+  monthNav: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  monthNavBtn: { padding: 8, backgroundColor: '#eef4fa', borderRadius: 8, borderWidth: 1, borderColor: '#cfe0f2' },
+  monthNavArrow: { fontSize: 22, color: '#002a54', fontWeight: 'bold', lineHeight: 24 },
+  monthNavTitle: { fontSize: 20, fontWeight: 'bold', color: '#002a54' },
+  monthWeekHeader: { flexDirection: 'row', marginBottom: 4 },
+  monthWeekDay: { flex: 1, textAlign: 'center', fontSize: 12, fontWeight: 'bold', color: '#888', paddingVertical: 6 },
+  monthGrid: { flexDirection: 'row', flexWrap: 'wrap' },
+  monthCell: { width: `${100/7}%` as any, aspectRatio: 1, alignItems: 'center', justifyContent: 'center', padding: 2, borderRadius: 8, marginBottom: 2 },
+  monthCellToday: { backgroundColor: '#eef4fa', borderWidth: 1, borderColor: '#4a9b40' },
+  monthCellSelected: { backgroundColor: '#002a54' },
+  monthDayNum: { fontSize: 15, fontWeight: '600', color: '#002a54' },
+  monthDayNumToday: { color: '#4a9b40', fontWeight: 'bold' },
+  monthDayNumSelected: { color: '#fff', fontWeight: 'bold' },
+  monthDots: { flexDirection: 'row', gap: 2, marginTop: 2, flexWrap: 'wrap', justifyContent: 'center' },
+  monthDot: { width: 6, height: 6, borderRadius: 3 },
+  monthDotMore: { fontSize: 9, color: '#999', fontWeight: 'bold' },
+  monthLegend: { flexDirection: 'row', justifyContent: 'center', gap: 20, marginTop: 16, marginBottom: 12 },
+  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  legendDot: { width: 10, height: 10, borderRadius: 5 },
+  legendText: { fontSize: 12, color: '#666' },
+  monthSummary: { backgroundColor: '#fff', borderRadius: 12, padding: 16, borderWidth: 1, borderColor: '#e0e8f0', marginTop: 4 },
+  monthSummaryTitle: { fontSize: 15, fontWeight: 'bold', color: '#002a54', marginBottom: 12 },
+  monthSummaryRow: { flexDirection: 'row', justifyContent: 'space-around' },
+  monthSummaryKpi: { alignItems: 'center' },
+  monthSummaryNum: { fontSize: 28, fontWeight: 'bold', color: '#002a54' },
+  monthSummaryLabel: { fontSize: 12, color: '#888', marginTop: 2 },
 });
