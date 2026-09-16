@@ -10,7 +10,7 @@ import {
   Linking
 } from 'react-native';
 import { Calendar } from 'react-native-calendars';
-import { collection, onSnapshot, query, where, doc, deleteDoc, addDoc } from 'firebase/firestore';
+import { collection, onSnapshot, query, where, doc, deleteDoc, addDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../config/firebase';
 
 interface Appointment {
@@ -28,6 +28,9 @@ interface Appointment {
 interface Team {
   id: string;
   name: string;
+  members?: string;
+  tools?: string;
+  vehicle?: string;
 }
 
 export default function CalendarScreen({ navigation }: any) {
@@ -36,9 +39,16 @@ export default function CalendarScreen({ navigation }: any) {
   const [teams, setTeams] = useState<Team[]>([]);
   const [conflicts, setConflicts] = useState<Record<string, string>>({});
   
-  // Modal para gestionar equipos
+  // Modal de gestión de equipos
   const [showTeamsModal, setShowTeamsModal] = useState(false);
-  const [newTeamName, setNewTeamName] = useState('');
+  const [editingTeamId, setEditingTeamId] = useState<string | null>(null);
+  const [teamName, setTeamName] = useState('');
+  const [teamMembers, setTeamMembers] = useState('');
+  const [teamVehicle, setTeamVehicle] = useState('');
+  const [teamTools, setTeamTools] = useState('');
+
+  // Control para desplegar u ocultar detalles de cada columna
+  const [expandedTeams, setExpandedTeams] = useState<Record<string, boolean>>({});
   const [showCalendar, setShowCalendar] = useState(false);
 
   const getMinutes = (timeStr: string) => {
@@ -46,15 +56,26 @@ export default function CalendarScreen({ navigation }: any) {
     return h * 60 + m;
   };
 
-  // 1. Cargar Equipos desde Firestore (y auto-inicializar si no hay ninguno)
+  // 1. Cargar Equipos desde Firestore
   useEffect(() => {
     const qTeams = query(collection(db, 'teams'));
     const unsubscribeTeams = onSnapshot(qTeams, async (snapshot) => {
       if (snapshot.empty) {
-        // Inicializar con Equipo 1 y Equipo 2 por defecto
         try {
-          await addDoc(collection(db, 'teams'), { name: 'Equipo 1', createdAt: new Date() });
-          await addDoc(collection(db, 'teams'), { name: 'Equipo 2', createdAt: new Date() });
+          await addDoc(collection(db, 'teams'), {
+            name: 'Equipo 1',
+            members: 'Carlos y Marcos',
+            vehicle: 'Furgoneta 1 (Citroën Berlingo)',
+            tools: 'Inyección-Extracción Kärcher, Cepillos, Vaporizador',
+            createdAt: new Date()
+          });
+          await addDoc(collection(db, 'teams'), {
+            name: 'Equipo 2',
+            members: 'Andrea y Javier',
+            vehicle: 'Furgoneta 2 (Renault Kangoo)',
+            tools: 'Máquina Tapicerías Pro, Hidrolimpiadora',
+            createdAt: new Date()
+          });
         } catch (e) {
           console.error(e);
         }
@@ -71,7 +92,7 @@ export default function CalendarScreen({ navigation }: any) {
     return () => unsubscribeTeams();
   }, []);
 
-  // 2. Cargar Citas de la fecha seleccionada y calcular conflictos por equipo
+  // 2. Cargar Citas y calcular conflictos por equipo
   useEffect(() => {
     const qApps = query(collection(db, 'appointments'), where('date', '==', selectedDate));
     const unsubscribeApps = onSnapshot(qApps, (snapshot) => {
@@ -82,7 +103,6 @@ export default function CalendarScreen({ navigation }: any) {
       
       const newConflicts: Record<string, string> = {};
       
-      // Evaluar conflictos por cada equipo
       teams.forEach((t) => {
         const teamApps = appsList.filter((a) => (a.team || teams[0]?.name || 'Equipo 1') === t.name);
         
@@ -109,17 +129,56 @@ export default function CalendarScreen({ navigation }: any) {
     return () => unsubscribeApps();
   }, [selectedDate, teams]);
 
-  const addTeam = async () => {
-    if (newTeamName.trim() === '') return;
-    try {
-      await addDoc(collection(db, 'teams'), {
-        name: newTeamName.trim(),
-        createdAt: new Date()
-      });
-      setNewTeamName('');
-    } catch (e) {
-      alert('Error al crear el equipo.');
+  const saveTeam = async () => {
+    if (teamName.trim() === '') {
+      alert('El nombre del equipo es obligatorio.');
+      return;
     }
+
+    try {
+      const teamData = {
+        name: teamName.trim(),
+        members: teamMembers.trim(),
+        vehicle: teamVehicle.trim(),
+        tools: teamTools.trim()
+      };
+
+      if (editingTeamId) {
+        await updateDoc(doc(db, 'teams', editingTeamId), {
+          ...teamData,
+          updatedAt: new Date()
+        });
+        setEditingTeamId(null);
+      } else {
+        await addDoc(collection(db, 'teams'), {
+          ...teamData,
+          createdAt: new Date()
+        });
+      }
+
+      setTeamName('');
+      setTeamMembers('');
+      setTeamVehicle('');
+      setTeamTools('');
+    } catch (e) {
+      alert('Error al guardar el equipo.');
+    }
+  };
+
+  const startEditTeam = (t: Team) => {
+    setEditingTeamId(t.id);
+    setTeamName(t.name);
+    setTeamMembers(t.members || '');
+    setTeamVehicle(t.vehicle || '');
+    setTeamTools(t.tools || '');
+  };
+
+  const cancelEditTeam = () => {
+    setEditingTeamId(null);
+    setTeamName('');
+    setTeamMembers('');
+    setTeamVehicle('');
+    setTeamTools('');
   };
 
   const removeTeam = async (id: string, name: string) => {
@@ -130,10 +189,18 @@ export default function CalendarScreen({ navigation }: any) {
     if (window.confirm(`¿Seguro que deseas eliminar el "${name}"?`)) {
       try {
         await deleteDoc(doc(db, 'teams', id));
+        if (editingTeamId === id) cancelEditTeam();
       } catch (e) {
         alert('Error al eliminar el equipo.');
       }
     }
+  };
+
+  const toggleTeamDetails = (teamId: string) => {
+    setExpandedTeams(prev => ({
+      ...prev,
+      [teamId]: !prev[teamId]
+    }));
   };
 
   const openMaps = (address: string | undefined) => {
@@ -153,7 +220,7 @@ export default function CalendarScreen({ navigation }: any) {
 
   return (
     <View style={styles.container}>
-      {/* Selector de Fecha Plegable */}
+      {/* Barra superior de herramientas */}
       <View style={styles.topBar}>
         <TouchableOpacity style={styles.datePickerBtn} onPress={() => setShowCalendar(!showCalendar)}>
           <Text style={styles.datePickerText}>📅 {selectedDate} {showCalendar ? '▲' : '▼'}</Text>
@@ -188,16 +255,36 @@ export default function CalendarScreen({ navigation }: any) {
           const teamApps = appointments.filter(
             (a) => (a.team || teams[0]?.name || 'Equipo 1') === t.name
           );
+          const isExpanded = !!expandedTeams[t.id];
 
           return (
             <View key={t.id} style={styles.teamColumn}>
-              {/* Cabecera de la columna del equipo */}
+              {/* Cabecera del Equipo */}
               <View style={styles.teamHeader}>
-                <Text style={styles.teamTitle}>🚐 {t.name}</Text>
-                <Text style={styles.teamCountBadge}>{teamApps.length} citas</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.teamTitle}>🚐 {t.name}</Text>
+                  {t.members ? <Text style={styles.teamHeaderSubtitle}>👥 {t.members}</Text> : null}
+                </View>
+                <View style={{ alignItems: 'flex-end', gap: 4 }}>
+                  <Text style={styles.teamCountBadge}>{teamApps.length} citas</Text>
+                  {(t.vehicle || t.tools) && (
+                    <TouchableOpacity onPress={() => toggleTeamDetails(t.id)}>
+                      <Text style={styles.infoToggleText}>{isExpanded ? 'Ocultar ▲' : 'Ficha ℹ️'}</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
               </View>
 
-              {/* Lista de citas asignadas a este equipo */}
+              {/* Ficha desplegable con Miembros, Vehículo y Herramientas */}
+              {isExpanded && (
+                <View style={styles.teamInfoBox}>
+                  {t.members ? <Text style={styles.teamInfoItem}><Text style={styles.infoBold}>Miembros:</Text> {t.members}</Text> : null}
+                  {t.vehicle ? <Text style={styles.teamInfoItem}><Text style={styles.infoBold}>Vehículo:</Text> {t.vehicle}</Text> : null}
+                  {t.tools ? <Text style={styles.teamInfoItem}><Text style={styles.infoBold}>Herramientas:</Text> {t.tools}</Text> : null}
+                </View>
+              )}
+
+              {/* Lista de citas de este equipo */}
               <ScrollView style={styles.columnBody} showsVerticalScrollIndicator={false}>
                 {teamApps.map((item) => (
                   <View key={item.id} style={styles.card}>
@@ -215,7 +302,7 @@ export default function CalendarScreen({ navigation }: any) {
 
                     {item.price ? (
                       <View style={styles.priceContainer}>
-                        <Text style={styles.priceText}>💶 {item.price} €</Text>
+                        <Text style={styles.priceText}>💶 Presupuesto: {item.price} €</Text>
                       </View>
                     ) : null}
 
@@ -235,7 +322,7 @@ export default function CalendarScreen({ navigation }: any) {
 
                 {teamApps.length === 0 && (
                   <View style={styles.emptyColumnBox}>
-                    <Text style={styles.emptyColumnText}>Sin citas asignadas</Text>
+                    <Text style={styles.emptyColumnText}>Sin citas hoy</Text>
                   </View>
                 )}
               </ScrollView>
@@ -244,42 +331,85 @@ export default function CalendarScreen({ navigation }: any) {
         })}
       </ScrollView>
 
-      {/* MODAL PARA GESTIONAR Y CONTROLAR EL NÚMERO DE EQUIPOS */}
+      {/* MODAL PARA GESTIONAR EQUIPOS, MIEMBROS, VEHÍCULOS Y HERRAMIENTAS */}
       <Modal visible={showTeamsModal} animationType="slide" transparent={true}>
         <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>⚙️ Configurar Equipos</Text>
-            <Text style={styles.modalSubtitle}>Añade o elimina los equipos de trabajo disponibles.</Text>
+          <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', alignItems: 'center' }}>
+            <View style={styles.modalCard}>
+              <Text style={styles.modalTitle}>
+                {editingTeamId ? '✏️ Modificar Equipo' : '⚙️ Configuración de Equipos'}
+              </Text>
+              <Text style={styles.modalSubtitle}>
+                Asigna el nombre, miembros, vehículo y herramientas para cada equipo.
+              </Text>
 
-            <View style={styles.addTeamRow}>
               <TextInput
-                style={styles.addTeamInput}
-                placeholder="Nombre (ej. Equipo 3, Furgoneta 2...)"
-                value={newTeamName}
-                onChangeText={setNewTeamName}
+                style={styles.modalInput}
+                placeholder="Nombre del equipo (ej. Equipo 1 - Norte)"
+                value={teamName}
+                onChangeText={setTeamName}
               />
-              <TouchableOpacity style={styles.addTeamBtn} onPress={addTeam}>
-                <Text style={styles.addTeamBtnText}>+ Añadir</Text>
+              <TextInput
+                style={styles.modalInput}
+                placeholder="👥 Miembros del equipo (ej. Carlos y Marta)"
+                value={teamMembers}
+                onChangeText={setTeamMembers}
+              />
+              <TextInput
+                style={styles.modalInput}
+                placeholder="🚗 Vehículo asignado (ej. Citroën Berlingo 1234-XYZ)"
+                value={teamVehicle}
+                onChangeText={setTeamVehicle}
+              />
+              <TextInput
+                style={styles.modalInput}
+                placeholder="🛠️ Herramientas (ej. Kärcher Puzzi, Cepillos, Vaporizador)"
+                value={teamTools}
+                onChangeText={setTeamTools}
+              />
+
+              <View style={{ flexDirection: 'row', gap: 10, marginTop: 5 }}>
+                {editingTeamId && (
+                  <TouchableOpacity style={styles.cancelEditBtn} onPress={cancelEditTeam}>
+                    <Text style={styles.cancelEditBtnText}>Cancelar</Text>
+                  </TouchableOpacity>
+                )}
+                <TouchableOpacity style={styles.saveTeamBtn} onPress={saveTeam}>
+                  <Text style={styles.saveTeamBtnText}>
+                    {editingTeamId ? 'Guardar Cambios' : '+ Añadir Equipo'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              <Text style={styles.teamListTitle}>Equipos Registrados ({teams.length})</Text>
+              <ScrollView style={{ maxHeight: 220 }}>
+                {teams.map((t) => (
+                  <View key={t.id} style={styles.teamCardItem}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.teamItemTitle}>🚐 {t.name}</Text>
+                      {t.members ? <Text style={styles.teamItemSub}>👥 {t.members}</Text> : null}
+                      {t.vehicle ? <Text style={styles.teamItemSub}>🚗 {t.vehicle}</Text> : null}
+                      {t.tools ? <Text style={styles.teamItemSub}>🛠️ {t.tools}</Text> : null}
+                    </View>
+                    <View style={styles.teamItemActions}>
+                      <TouchableOpacity style={styles.iconBtn} onPress={() => startEditTeam(t)}>
+                        <Text style={styles.iconBtnText}>✏️</Text>
+                      </TouchableOpacity>
+                      {teams.length > 1 && (
+                        <TouchableOpacity style={styles.iconBtn} onPress={() => removeTeam(t.id, t.name)}>
+                          <Text style={styles.iconBtnText}>🗑️</Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  </View>
+                ))}
+              </ScrollView>
+
+              <TouchableOpacity style={styles.closeModalBtn} onPress={() => { cancelEditTeam(); setShowTeamsModal(false); }}>
+                <Text style={styles.closeModalBtnText}>Cerrar Ventana</Text>
               </TouchableOpacity>
             </View>
-
-            <ScrollView style={{ maxHeight: 220, marginVertical: 10 }}>
-              {teams.map((t) => (
-                <View key={t.id} style={styles.teamListItem}>
-                  <Text style={styles.teamListItemText}>🚐 {t.name}</Text>
-                  {teams.length > 1 && (
-                    <TouchableOpacity onPress={() => removeTeam(t.id, t.name)}>
-                      <Text style={styles.removeTeamText}>Eliminar 🗑️</Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-              ))}
-            </ScrollView>
-
-            <TouchableOpacity style={styles.closeModalBtn} onPress={() => setShowTeamsModal(false)}>
-              <Text style={styles.closeModalBtnText}>Cerrar y Volver</Text>
-            </TouchableOpacity>
-          </View>
+          </ScrollView>
         </View>
       </Modal>
     </View>
@@ -351,21 +481,32 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 14,
-    paddingVertical: 12,
+    paddingVertical: 10,
     backgroundColor: '#002a54',
     borderTopLeftRadius: 9,
     borderTopRightRadius: 9
   },
   teamTitle: { color: '#ffffff', fontWeight: 'bold', fontSize: 16 },
+  teamHeaderSubtitle: { color: '#b0cbe8', fontSize: 12, marginTop: 2 },
   teamCountBadge: {
     backgroundColor: '#4a9b40',
     color: '#ffffff',
     fontWeight: 'bold',
     fontSize: 12,
     paddingHorizontal: 8,
-    paddingVertical: 3,
+    paddingVertical: 2,
     borderRadius: 12
   },
+  infoToggleText: { color: '#b0cbe8', fontSize: 11, textDecorationLine: 'underline', marginTop: 2 },
+  teamInfoBox: {
+    backgroundColor: '#f4f8fc',
+    padding: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#dbe2ea',
+    gap: 3
+  },
+  teamInfoItem: { fontSize: 12, color: '#333' },
+  infoBold: { fontWeight: 'bold', color: '#002a54' },
   columnBody: { padding: 12, flex: 1 },
   card: {
     backgroundColor: '#fbfcfd',
@@ -414,17 +555,22 @@ const styles = StyleSheet.create({
   emptyColumnText: { color: '#999', fontStyle: 'italic', fontSize: 14 },
   
   // Estilos del Modal
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 20 },
-  modalCard: { width: '100%', maxWidth: 450, backgroundColor: '#fff', borderRadius: 12, padding: 20, elevation: 5 },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 15 },
+  modalCard: { width: '100%', maxWidth: 500, backgroundColor: '#fff', borderRadius: 12, padding: 20, elevation: 5 },
   modalTitle: { fontSize: 20, fontWeight: 'bold', color: '#002a54', marginBottom: 4 },
-  modalSubtitle: { fontSize: 13, color: '#666', marginBottom: 15 },
-  addTeamRow: { flexDirection: 'row', gap: 8, marginBottom: 15 },
-  addTeamInput: { flex: 1, borderWidth: 1, borderColor: '#ccc', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14 },
-  addTeamBtn: { backgroundColor: '#4a9b40', paddingHorizontal: 15, justifyContent: 'center', borderRadius: 8 },
-  addTeamBtnText: { color: '#fff', fontWeight: 'bold', fontSize: 14 },
-  teamListItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#eee' },
-  teamListItemText: { fontSize: 15, fontWeight: 'bold', color: '#002a54' },
-  removeTeamText: { color: '#d9534f', fontWeight: 'bold', fontSize: 13 },
+  modalSubtitle: { fontSize: 13, color: '#666', marginBottom: 12 },
+  modalInput: { borderWidth: 1, borderColor: '#ccc', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 9, fontSize: 14, marginBottom: 8, backgroundColor: '#fafafa' },
+  saveTeamBtn: { flex: 1, backgroundColor: '#4a9b40', paddingVertical: 12, borderRadius: 8, alignItems: 'center' },
+  saveTeamBtnText: { color: '#fff', fontWeight: 'bold', fontSize: 15 },
+  cancelEditBtn: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#d9534f', paddingHorizontal: 15, paddingVertical: 12, borderRadius: 8, alignItems: 'center' },
+  cancelEditBtnText: { color: '#d9534f', fontWeight: 'bold', fontSize: 14 },
+  teamListTitle: { fontSize: 15, fontWeight: 'bold', color: '#002a54', marginTop: 18, marginBottom: 8 },
+  teamCardItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 10, backgroundColor: '#f7f9fb', borderRadius: 8, marginBottom: 8, borderWidth: 1, borderColor: '#e3ebf2' },
+  teamItemTitle: { fontSize: 15, fontWeight: 'bold', color: '#002a54' },
+  teamItemSub: { fontSize: 12, color: '#555', marginTop: 2 },
+  teamItemActions: { flexDirection: 'row', gap: 6 },
+  iconBtn: { padding: 6, backgroundColor: '#fff', borderRadius: 6, borderWidth: 1, borderColor: '#ddd' },
+  iconBtnText: { fontSize: 14 },
   closeModalBtn: { backgroundColor: '#002a54', padding: 12, borderRadius: 8, alignItems: 'center', marginTop: 15 },
   closeModalBtnText: { color: '#fff', fontWeight: 'bold', fontSize: 15 }
 });
