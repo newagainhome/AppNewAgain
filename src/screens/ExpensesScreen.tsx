@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, FlatList, ActivityIndicator, Image, Linking, ScrollView } from 'react-native';
 import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { ref, uploadBytes, getDownloadURL, uploadString } from 'firebase/storage';
 import * as ImagePicker from 'expo-image-picker';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
@@ -26,6 +26,7 @@ export default function ExpensesScreen() {
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [selectedTeam, setSelectedTeam] = useState('Oficina/General');
   const [ticketImage, setTicketImage] = useState<string | null>(null);
+  const [ticketBase64, setTicketBase64] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
 
@@ -56,6 +57,9 @@ export default function ExpensesScreen() {
   const handleImageResult = (result: ImagePicker.ImagePickerResult) => {
     if (!result.canceled && result.assets && result.assets.length > 0) {
       setTicketImage(result.assets[0].uri);
+      if (result.assets[0].base64) {
+        setTicketBase64(result.assets[0].base64);
+      }
     }
   };
 
@@ -64,7 +68,8 @@ export default function ExpensesScreen() {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
-        quality: 0.2, // Compresión alta y segura para evitar fallos
+        quality: 0.2,
+        base64: true,
       });
       handleImageResult(result);
     } catch (error) {
@@ -76,7 +81,8 @@ export default function ExpensesScreen() {
     try {
       const result = await ImagePicker.launchCameraAsync({
         allowsEditing: true,
-        quality: 0.2, // Compresión alta y segura para evitar fallos
+        quality: 0.2,
+        base64: true,
       });
       handleImageResult(result);
     } catch (error) {
@@ -95,11 +101,20 @@ export default function ExpensesScreen() {
       let downloadUrl = '';
 
       if (ticketImage) {
-        const response = await fetch(ticketImage);
-        const blob = await response.blob();
         const fileName = `tickets/${Date.now()}.jpg`;
         const storageRef = ref(storage, fileName);
-        await uploadBytes(storageRef, blob);
+
+        if (ticketBase64) {
+          const dataUrl = `data:image/jpeg;base64,${ticketBase64}`;
+          await uploadString(storageRef, dataUrl, 'data_url');
+        } else if (ticketImage.startsWith('data:')) {
+          await uploadString(storageRef, ticketImage, 'data_url');
+        } else {
+          const response = await fetch(ticketImage);
+          const blob = await response.blob();
+          await uploadBytes(storageRef, blob);
+        }
+        
         downloadUrl = await getDownloadURL(storageRef);
       }
 
@@ -117,8 +132,10 @@ export default function ExpensesScreen() {
       setDate(new Date().toISOString().split('T')[0]);
       setSelectedTeam('Oficina/General');
       setTicketImage(null);
+      setTicketBase64(null);
       setUploading(false);
     } catch (error) {
+      console.log('Error uploading ticket:', error);
       alert('Hubo un error al guardar el gasto.');
       setUploading(false);
     }
