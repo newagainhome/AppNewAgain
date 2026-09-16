@@ -5,7 +5,7 @@ import { db } from '../config/firebase';
 import { useAppContext } from '../context/AppContext';
 
 export default function RoleSelectionScreen() {
-  const { loginAsAdmin, loginAsTeam } = useAppContext();
+  const { loginAsAdmin, loginAsManagement, loginAsTeam } = useAppContext();
   const [teams, setTeams] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   
@@ -91,12 +91,26 @@ export default function RoleSelectionScreen() {
           ) : (
             <View>
               <Text style={styles.cardTitle}>¿Quién eres?</Text>
+
+              {/* Admin */}
               <TouchableOpacity style={styles.adminBtn} onPress={handleAdminPress}>
                 <View style={styles.btnInner}>
                   <Text style={styles.btnEmoji}>👑</Text>
                   <View>
                     <Text style={styles.adminBtnTitle}>Administrador</Text>
                     <Text style={styles.adminBtnSub}>Acceso completo al sistema</Text>
+                  </View>
+                </View>
+                <Text style={styles.chevron}>›</Text>
+              </TouchableOpacity>
+
+              {/* Gestión */}
+              <TouchableOpacity style={styles.mgmtBtn} onPress={loginAsManagement}>
+                <View style={styles.btnInner}>
+                  <Text style={styles.btnEmoji}>📋</Text>
+                  <View>
+                    <Text style={styles.mgmtBtnTitle}>Gestión</Text>
+                    <Text style={styles.mgmtBtnSub}>Clientes, calendario y operativa</Text>
                   </View>
                 </View>
                 <Text style={styles.chevron}>›</Text>
@@ -165,6 +179,9 @@ const styles = StyleSheet.create({
   dividerRow: { flexDirection: 'row', alignItems: 'center', marginVertical: 20, gap: 10 },
   dividerLine: { flex: 1, height: 1, backgroundColor: 'rgba(255,255,255,0.1)' },
   dividerText: { color: 'rgba(255,255,255,0.35)', fontSize: 12 },
+  mgmtBtn: { backgroundColor: 'rgba(52,152,219,0.15)', borderWidth: 1.5, borderColor: '#3498db', borderRadius: 14, padding: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, marginTop: 8 },
+  mgmtBtnTitle: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
+  mgmtBtnSub: { color: 'rgba(255,255,255,0.5)', fontSize: 12, marginTop: 2 },
   pinSection: { gap: 4 },
   pinTitle: { fontSize: 20, fontWeight: 'bold', color: '#fff', textAlign: 'center', marginBottom: 6 },
   pinSubtitle: { color: 'rgba(255,255,255,0.5)', textAlign: 'center', marginBottom: 20, fontSize: 14 },
