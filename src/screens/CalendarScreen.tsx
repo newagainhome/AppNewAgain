@@ -622,14 +622,17 @@ export default function CalendarScreen({ navigation }: any) {
     `;
   
     try {
-      const { uri } = await Print.printToFileAsync({ html });
       if (Platform.OS === 'web') {
-        window.open(uri, '_blank');
+        // En web, printAsync abre directamente el diálogo nativo de impresión/guardar PDF
+        await Print.printAsync({ html });
       } else {
+        // En móviles, generamos el archivo físico y abrimos el menú de compartir
+        const { uri } = await Print.printToFileAsync({ html });
         await Sharing.shareAsync(uri);
       }
-    } catch (error) {
-      alert('Error al generar la factura');
+    } catch (error: any) {
+      console.error(error);
+      alert('Error al generar la factura: ' + (error.message || error));
     }
   };
 
