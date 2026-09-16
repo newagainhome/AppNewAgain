@@ -1,5 +1,5 @@
 import React from 'react';
-import { Image, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { Image, View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { NavigationContainer } from '@react-navigation/native';
@@ -25,53 +25,59 @@ function LogoTitle() {
   );
 }
 
-// Barra de pestañas 100% personalizada para garantizar visibilidad total en web
+// Barra de pestañas adaptable a Móvil y Ordenador (con deslizamiento táctil horizontal)
 function CustomTopTabBar({ state, descriptors, navigation }: any) {
   return (
-    <View style={styles.tabContainer}>
-      {state.routes.map((route: any, index: number) => {
-        const { options } = descriptors[route.key];
-        const label =
-          options.tabBarLabel !== undefined
-            ? options.tabBarLabel
-            : options.title !== undefined
-            ? options.title
-            : route.name;
+    <View style={styles.tabBarWrapper}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.tabScrollContent}
+      >
+        {state.routes.map((route: any, index: number) => {
+          const { options } = descriptors[route.key];
+          const label =
+            options.tabBarLabel !== undefined
+              ? options.tabBarLabel
+              : options.title !== undefined
+              ? options.title
+              : route.name;
 
-        const isFocused = state.index === index;
+          const isFocused = state.index === index;
 
-        const onPress = () => {
-          const event = navigation.emit({
-            type: 'tabPress',
-            target: route.key,
-            canPreventDefault: true,
-          });
+          const onPress = () => {
+            const event = navigation.emit({
+              type: 'tabPress',
+              target: route.key,
+              canPreventDefault: true,
+            });
 
-          if (!isFocused && !event.defaultPrevented) {
-            navigation.navigate(route.name);
-          }
-        };
+            if (!isFocused && !event.defaultPrevented) {
+              navigation.navigate(route.name);
+            }
+          };
 
-        return (
-          <TouchableOpacity
-            key={route.key}
-            onPress={onPress}
-            style={[
-              styles.tabButton,
-              isFocused ? styles.tabButtonActive : styles.tabButtonInactive
-            ]}
-          >
-            <Text
+          return (
+            <TouchableOpacity
+              key={route.key}
+              onPress={onPress}
               style={[
-                styles.tabText,
-                isFocused ? styles.tabTextActive : styles.tabTextInactive
+                styles.tabButton,
+                isFocused ? styles.tabButtonActive : styles.tabButtonInactive
               ]}
             >
-              {label}
-            </Text>
-          </TouchableOpacity>
-        );
-      })}
+              <Text
+                style={[
+                  styles.tabText,
+                  isFocused ? styles.tabTextActive : styles.tabTextInactive
+                ]}
+              >
+                {label}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
     </View>
   );
 }
@@ -79,12 +85,12 @@ function CustomTopTabBar({ state, descriptors, navigation }: any) {
 function TopTabs() {
   return (
     <Tab.Navigator tabBar={(props) => <CustomTopTabBar {...props} />}>
-      <Tab.Screen name="Dashboard" component={DashboardScreen} options={{ tabBarLabel: 'Dashboard' }} />
-      <Tab.Screen name="Calendar" component={CalendarScreen} options={{ tabBarLabel: 'Calendario' }} />
-      <Tab.Screen name="Route" component={RouteScreen} options={{ tabBarLabel: 'Rutas' }} />
-      <Tab.Screen name="Appointments" component={AppointmentsScreen} options={{ tabBarLabel: 'Nueva Cita' }} />
-      <Tab.Screen name="Clients" component={ClientsScreen} options={{ tabBarLabel: 'Clientes' }} />
-      <Tab.Screen name="Services" component={ServicesScreen} options={{ tabBarLabel: 'Servicios' }} />
+      <Tab.Screen name="Dashboard" component={DashboardScreen} options={{ tabBarLabel: '📊 Dashboard' }} />
+      <Tab.Screen name="Calendar" component={CalendarScreen} options={{ tabBarLabel: '📅 Calendario' }} />
+      <Tab.Screen name="Route" component={RouteScreen} options={{ tabBarLabel: '🗺️ Rutas' }} />
+      <Tab.Screen name="Appointments" component={AppointmentsScreen} options={{ tabBarLabel: '➕ Nueva Cita' }} />
+      <Tab.Screen name="Clients" component={ClientsScreen} options={{ tabBarLabel: '👥 Clientes' }} />
+      <Tab.Screen name="Services" component={ServicesScreen} options={{ tabBarLabel: '🧹 Servicios' }} />
     </Tab.Navigator>
   );
 }
@@ -108,19 +114,24 @@ export default function AppNavigator() {
 const styles = StyleSheet.create({
   logoContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingBottom: 5 },
   logoImage: { width: 140, height: 40 },
-  tabContainer: {
-    flexDirection: 'row',
+  tabBarWrapper: {
     backgroundColor: '#ffffff',
     borderBottomWidth: 2,
     borderBottomColor: '#e0e0e0',
     elevation: 3,
     shadowColor: '#000',
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.08,
     shadowOffset: { width: 0, height: 2 }
   },
+  tabScrollContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    minWidth: '100%',
+    justifyContent: 'space-around'
+  },
   tabButton: {
-    flex: 1,
-    paddingVertical: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
     alignItems: 'center',
     justifyContent: 'center',
     borderBottomWidth: 4,
@@ -137,7 +148,7 @@ const styles = StyleSheet.create({
   tabText: {
     color: '#002a54',
     fontWeight: 'bold',
-    fontSize: 13,
+    fontSize: 14,
     textAlign: 'center'
   },
   tabTextActive: {
@@ -148,6 +159,6 @@ const styles = StyleSheet.create({
   tabTextInactive: {
     color: '#002a54',
     fontWeight: 'bold',
-    opacity: 0.65
+    opacity: 0.6
   }
 });
