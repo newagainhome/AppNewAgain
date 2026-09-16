@@ -957,85 +957,120 @@ export default function CalendarScreen({ route, navigation }: any) {
         </View>
       )}
 
-      {/* VISTA EN COLUMNAS POR CADA EQUIPO DISPONIBLE */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={true} style={styles.columnsScrollView}>
-        {teams.filter(t => isAdmin || t.name === userTeamName).map((t) => {
-          const teamApps = appointments.filter(
-            (a) => (a.team || teams[0]?.name || 'Equipo 1') === t.name
-          );
-          const isExpanded = !!expandedTeams[t.id];
+      {/* ===== VISTA DE CUADRÍCULA HORARIA (09:00 - 20:30) ===== */}
+      {calendarView === 'day' && (() => {
+        const START_HOUR = 9;      // 09:00
+        const END_HOUR = 20.5;     // 20:30
+        const TOTAL_MINS = (END_HOUR - START_HOUR) * 60; // 690 min
+        const PX_PER_MIN = 2;      // 2px por minuto → cada hora = 120px
+        const GRID_HEIGHT = TOTAL_MINS * PX_PER_MIN;
+        const LABEL_WIDTH = 48;
+        const COL_WIDTH = 180;
+        const HOUR_LINES = Array.from({ length: Math.ceil(END_HOUR - START_HOUR) + 1 }, (_, i) => START_HOUR + i);
+        const visibleTeams = teams.filter(t => isAdmin || t.name === userTeamName);
 
-          const getCardStyle = (status?: string) => {
-            if (status === 'in_progress') return [styles.card, styles.cardInProgress];
-            if (status === 'completed') return [styles.card, styles.cardCompleted];
-            return styles.card;
-          };
+        const timeToTop = (time: string) => {
+          const [h, m] = time.split(':').map(Number);
+          return ((h * 60 + m) - START_HOUR * 60) * PX_PER_MIN;
+        };
 
-          return (
-            <View key={t.id} style={styles.teamColumn}>
-              {/* Cabecera del Equipo */}
-              <View style={styles.teamHeader}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.teamTitle}>🚐 {t.name}</Text>
-                  {t.members ? <Text style={styles.teamHeaderSubtitle}>👥 {t.members}</Text> : null}
-                </View>
-                <View style={{ alignItems: 'flex-end', gap: 4 }}>
-                  <Text style={styles.teamCountBadge}>{teamApps.length} citas</Text>
-                  {(t.vehicle || t.tools) && (
-                    <TouchableOpacity onPress={() => toggleTeamDetails(t.id)}>
-                      <Text style={styles.infoToggleText}>{isExpanded ? 'Ocultar ▲' : 'Ficha ℹ️'}</Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-              </View>
+        const STATUS_COLORS: Record<string, { bg: string; border: string; text: string }> = {
+          pending:     { bg: '#fffbeb', border: '#f39c12', text: '#92400e' },
+          in_progress: { bg: '#eff6ff', border: '#3498db', text: '#1e3a8a' },
+          completed:   { bg: '#f0fdf4', border: '#4a9b40', text: '#14532d' },
+        };
 
-              {/* Ficha desplegable con Miembros, Vehículo y Herramientas */}
-              {isExpanded && (
-                <View style={styles.teamInfoBox}>
-                  {t.members ? <Text style={styles.teamInfoItem}><Text style={styles.infoBold}>Miembros:</Text> {t.members}</Text> : null}
-                  {t.vehicle ? <Text style={styles.teamInfoItem}><Text style={styles.infoBold}>Vehículo:</Text> {t.vehicle}</Text> : null}
-                  {t.tools ? <Text style={styles.teamInfoItem}><Text style={styles.infoBold}>Herramientas:</Text> {t.tools}</Text> : null}
-                </View>
-              )}
-
-              {/* Lista de citas de este equipo */}
-              <ScrollView style={styles.columnBody} showsVerticalScrollIndicator={false}>
-                {teamApps.map((item) => (
-                  <TouchableOpacity 
-                    key={item.id} 
-                    style={getCardStyle(item.status)}
-                    onPress={() => setSelectedAppointment(item)}
-                  >
-                    <View style={styles.cardHeader}>
-                      <Text style={styles.time}>{item.time} (🕒 {item.duration}m)</Text>
-                      <View style={{ flexDirection: 'row', gap: 4 }}>
-                        {item.delayMinutes ? <Text style={styles.delayBadge}>+{item.delayMinutes}m</Text> : null}
-                        {conflicts[item.id] && <Text style={{fontSize: 14}}>⚠️</Text>}
-                      </View>
-                    </View>
-
-                    <Text style={styles.service}>{item.serviceName}</Text>
-                    <Text style={styles.client}>👤 {item.client}</Text>
-
-                    <View style={styles.cardMiniIndicators}>
-                      {item.price ? <Text style={styles.miniIcon}>💶</Text> : null}
-                      {item.phone ? <Text style={styles.miniIcon}>📞</Text> : null}
-                      {item.address ? <Text style={styles.miniIcon}>📍</Text> : null}
-                      {item.photos && item.photos.length > 0 ? <Text style={styles.miniIcon}>📸</Text> : null}
-                    </View>
-                  </TouchableOpacity>
-                ))}
-
-                {teamApps.length === 0 && (
-                  <View style={styles.emptyColumnBox}>
-                    <Text style={styles.emptyColumnText}>Sin citas hoy</Text>
+        return (
+          <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
+            {/* Cabeceras de equipo */}
+            <View style={{ flexDirection: 'row', marginLeft: LABEL_WIDTH, borderBottomWidth: 2, borderBottomColor: '#e0e8f0' }}>
+              {visibleTeams.map(t => {
+                const teamApps = appointments.filter(a => (a.team || teams[0]?.name) === t.name);
+                return (
+                  <View key={t.id} style={{ width: COL_WIDTH, paddingHorizontal: 8, paddingVertical: 10, borderRightWidth: 1, borderRightColor: '#e0e8f0', backgroundColor: '#f8fafc' }}>
+                    <Text style={{ fontWeight: 'bold', color: '#002a54', fontSize: 13 }}>🚐 {t.name}</Text>
+                    {t.members ? <Text style={{ fontSize: 11, color: '#888', marginTop: 2 }}>👥 {t.members}</Text> : null}
+                    <Text style={{ fontSize: 11, color: '#4a9b40', marginTop: 2, fontWeight: 'bold' }}>{teamApps.length} cita{teamApps.length !== 1 ? 's' : ''}</Text>
                   </View>
-                )}
-              </ScrollView>
+                );
+              })}
             </View>
-          );
-        })}
-      </ScrollView>
+
+            {/* Cuerpo del grid */}
+            <ScrollView horizontal showsHorizontalScrollIndicator={true}>
+              <View style={{ flexDirection: 'row' }}>
+
+                {/* Etiquetas de horas */}
+                <View style={{ width: LABEL_WIDTH }}>
+                  {Array.from({ length: GRID_HEIGHT / (60 * PX_PER_MIN) + 1 }, (_, i) => {
+                    const h = START_HOUR + i;
+                    if (h > END_HOUR) return null;
+                    return (
+                      <View key={h} style={{ height: 60 * PX_PER_MIN, justifyContent: 'flex-start', paddingTop: 4, paddingRight: 6 }}>
+                        <Text style={{ fontSize: 11, color: '#aaa', textAlign: 'right' }}>{String(Math.floor(h)).padStart(2,'0')}:00</Text>
+                      </View>
+                    );
+                  })}
+                </View>
+
+                {/* Columnas por equipo */}
+                {visibleTeams.map(t => {
+                  const teamApps = appointments.filter(a => (a.team || teams[0]?.name) === t.name);
+                  return (
+                    <View key={t.id} style={{ width: COL_WIDTH, height: GRID_HEIGHT, position: 'relative', borderRightWidth: 1, borderRightColor: '#e8eef4' }}>
+                      {/* Líneas de hora */}
+                      {HOUR_LINES.map(h => (
+                        <View key={h} style={{ position: 'absolute', top: (h - START_HOUR) * 60 * PX_PER_MIN, left: 0, right: 0, height: 1, backgroundColor: h % 1 === 0 ? '#e8eef4' : '#f4f6f8' }} />
+                      ))}
+
+                      {/* Bloque de media hora */}
+                      {HOUR_LINES.map(h => (
+                        <View key={`h-${h}`} style={{ position: 'absolute', top: (h - START_HOUR) * 60 * PX_PER_MIN + 30 * PX_PER_MIN, left: 0, right: 0, height: 1, backgroundColor: '#f0f4f8', borderStyle: 'dashed' }} />
+                      ))}
+
+                      {/* Citas posicionadas */}
+                      {teamApps.map(item => {
+                        const top = timeToTop(item.time);
+                        const dur = parseInt(item.duration || '60');
+                        const height = Math.max(dur * PX_PER_MIN, 30);
+                        const colors = STATUS_COLORS[item.status || 'pending'];
+                        return (
+                          <TouchableOpacity
+                            key={item.id}
+                            onPress={() => setSelectedAppointment(item)}
+                            style={{
+                              position: 'absolute',
+                              top,
+                              left: 3,
+                              right: 3,
+                              height,
+                              backgroundColor: colors.bg,
+                              borderRadius: 6,
+                              borderLeftWidth: 3,
+                              borderLeftColor: colors.border,
+                              borderWidth: 1,
+                              borderColor: colors.border + '55',
+                              paddingHorizontal: 6,
+                              paddingVertical: 4,
+                              overflow: 'hidden',
+                              elevation: 2,
+                            }}
+                          >
+                            <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.text }} numberOfLines={1}>{item.time} · {item.serviceName}</Text>
+                            {height > 35 && <Text style={{ fontSize: 10, color: colors.text, opacity: 0.75, marginTop: 1 }} numberOfLines={1}>👤 {item.client}</Text>}
+                            {height > 55 && item.address && <Text style={{ fontSize: 10, color: colors.text, opacity: 0.6, marginTop: 1 }} numberOfLines={1}>📍 {item.address}</Text>}
+                            {conflicts[item.id] && <Text style={{ fontSize: 10, color: '#d9534f' }}>⚠️</Text>}
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  );
+                })}
+              </View>
+            </ScrollView>
+          </ScrollView>
+        );
+      })()}
 
       {/* MODAL DE DETALLES DEL SERVICIO */}
       <Modal visible={!!selectedAppointment} animationType="slide" transparent={true}>
