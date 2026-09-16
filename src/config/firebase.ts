@@ -1,6 +1,7 @@
 import { initializeApp } from 'firebase/app';
-import { getFirestore } from 'firebase/firestore';
+import { getFirestore, initializeFirestore, persistentLocalCache, memoryLocalCache } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
+import { Platform } from 'react-native';
 
 const firebaseConfig = {
   apiKey: "AIzaSyD8RcGHihBLmx2rU8VEa4ede5r6DDFiHRE",
@@ -13,5 +14,10 @@ const firebaseConfig = {
 };
 
 export const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app);
+
+// Configurar base de datos con Modo Sótano (Offline Persistence)
+export const db = initializeFirestore(app, {
+  localCache: Platform.OS === 'web' ? persistentLocalCache() : memoryLocalCache()
+});
+
 export const storage = getStorage(app);
