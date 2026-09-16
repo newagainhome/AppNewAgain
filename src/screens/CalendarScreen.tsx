@@ -49,7 +49,7 @@ interface Team {
 }
 
 export default function CalendarScreen({ route, navigation }: any) {
-  const { role, teamName } = route?.params || { role: 'admin', teamName: null };
+  const { role, teamName: userTeamName } = route?.params || { role: 'admin', teamName: null };
   const isAdmin = role === 'admin';
 
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
@@ -57,7 +57,7 @@ export default function CalendarScreen({ route, navigation }: any) {
   const [teams, setTeams] = useState<any[]>([]);
   
   // Set default team to logged-in team if not admin
-  const [filterTeam, setFilterTeam] = useState<string | null>(isAdmin ? null : teamName);
+  const [filterTeam, setFilterTeam] = useState<string | null>(isAdmin ? null : userTeamName);
   const [conflicts, setConflicts] = useState<Record<string, string>>({});
   
   // Recordatorios y Fotos
@@ -703,7 +703,7 @@ export default function CalendarScreen({ route, navigation }: any) {
 
       {/* VISTA EN COLUMNAS POR CADA EQUIPO DISPONIBLE */}
       <ScrollView horizontal showsHorizontalScrollIndicator={true} style={styles.columnsScrollView}>
-        {teams.filter(t => isAdmin || t.name === teamName).map((t) => {
+        {teams.filter(t => isAdmin || t.name === userTeamName).map((t) => {
           const teamApps = appointments.filter(
             (a) => (a.team || teams[0]?.name || 'Equipo 1') === t.name
           );
