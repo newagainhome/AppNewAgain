@@ -39,9 +39,8 @@ export default function AppointmentsScreen({ navigation }: any) {
     return () => unsubscribe();
   }, [date]);
 
-  // Chequea conflictos SÓLO para el equipo seleccionado
-  const checkIfSlotHasConflict = (testTime: string) => {
-    if (!selectedService) return false;
+  const checkSlotStatus = (testTime: string) => {
+    if (!selectedService) return { conflict: false };
     const teamApps = existingAppointments.filter(a => (a.team || 'Equipo 1') === team);
 
     const getMinutes = (t: string) => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
@@ -52,11 +51,17 @@ export default function AppointmentsScreen({ navigation }: any) {
     for (const app of teamApps) {
       const existingStart = getMinutes(app.time);
       const existingEnd = existingStart + parseInt(app.duration);
-      if (newStart < existingEnd && newEnd > existingStart) return true; 
-      if (newStart >= existingEnd && newStart - existingEnd < travelMargin) return true; 
-      if (newEnd <= existingStart && existingStart - newEnd < travelMargin) return true; 
+      if (newStart < existingEnd && newEnd > existingStart) {
+        return { conflict: true, reason: `⚠️ Solapamiento: Ya hay una cita de ${app.time} a ${Math.floor(existingEnd/60)}:${(existingEnd%60).toString().padStart(2,'0')}.` };
+      }
+      if (newStart >= existingEnd && newStart - existingEnd < travelMargin) {
+        return { conflict: true, reason: `🚗 Falta tiempo al llegar: La cita de antes acaba a las ${Math.floor(existingEnd/60)}:${(existingEnd%60).toString().padStart(2,'0')}. Solo tienes ${newStart - existingEnd} min para conducir.` };
+      }
+      if (newEnd <= existingStart && existingStart - newEnd < travelMargin) {
+        return { conflict: true, reason: `🚗 Falta tiempo al salir: Terminarías a las ${Math.floor(newEnd/60)}:${(newEnd%60).toString().padStart(2,'0')}. Solo tienes ${existingStart - newEnd} min para conducir a la cita de las ${app.time}.` };
+      }
     }
-    return false;
+    return { conflict: false };
   };
 
   const findOptimalSlot = async () => {
@@ -131,8 +136,9 @@ export default function AppointmentsScreen({ navigation }: any) {
       alert("Faltan datos por rellenar.");
       return;
     }
-    if (checkIfSlotHasConflict(time)) {
-      alert("La hora seleccionada tiene conflictos para este equipo.");
+    const status = checkSlotStatus(time);
+    if (status.conflict) {
+      alert(status.reason);
       return;
     }
     try {
@@ -172,7 +178,7 @@ export default function AppointmentsScreen({ navigation }: any) {
             style={[styles.chipBtn, selectedService?.id === srv.id && styles.chipSelected]}
             onPress={() => setSelectedService(srv)}
           >
-            <Text style={selectedService?.id === srv.id ? styles.textSelected : styles.textUnselected}>{srv.name}</Text>
+            <Text style={selectedService?.id === srv.id ? styles.textSelected : styles.textUnselected}>{srv.name} (⏱ {srv.duration}m)</Text>
           </TouchableOpacity>
         ))}
       </ScrollView>
@@ -224,7 +230,8 @@ export default function AppointmentsScreen({ navigation }: any) {
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.scrollRow}>
         {timeSlots.map(t => {
-          const isConflict = selectedService ? checkIfSlotHasConflict(t) : false;
+          const status = checkSlotStatus(t);
+          const isConflict = selectedService ? status.conflict : false;
           let chipStyle: any = styles.chipBtn; let textStyle: any = styles.textUnselected;
           if (time === t) { chipStyle = styles.chipSelected; textStyle = styles.textSelected; } 
           else if (selectedService) {
@@ -232,7 +239,7 @@ export default function AppointmentsScreen({ navigation }: any) {
              else { chipStyle = styles.chipAvailable; textStyle = styles.textAvailable; }
           }
           return (
-            <TouchableOpacity key={t} style={chipStyle} onPress={() => { if (isConflict) alert("Conflicto detectado."); setTime(t); }}>
+            <TouchableOpacity key={t} style={chipStyle} onPress={() => { if (isConflict) alert(status.reason); setTime(t); }}>
               <Text style={textStyle}>{t}</Text>
             </TouchableOpacity>
           );
