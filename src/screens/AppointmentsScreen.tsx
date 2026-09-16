@@ -24,7 +24,7 @@ export default function AppointmentsScreen({ navigation }: any) {
 
   const saveAppointment = async () => {
     if (!client || !date || !time || !selectedService) {
-      alert("Rellena todos los campos y selecciona un servicio.");
+      alert("Rellena todos los campos (cliente, fecha, hora y servicio).");
       return;
     }
 
@@ -42,13 +42,24 @@ export default function AppointmentsScreen({ navigation }: any) {
     }
   };
 
+  // Generar horas en intervalos de 15 minutos (de 08:00 a 20:45)
+  const generateTimeSlots = () => {
+    const slots = [];
+    for (let h = 8; h <= 20; h++) {
+      for (let m = 0; m < 60; m += 15) {
+        slots.push(`${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`);
+      }
+    }
+    return slots;
+  };
+  const timeSlots = generateTimeSlots();
+
   return (
     <ScrollView style={styles.container}>
       <Text style={styles.title}>Programar Nueva Cita</Text>
       
       <TextInput style={styles.input} placeholder="Nombre del cliente" value={client} onChangeText={setClient} />
       <TextInput style={styles.input} placeholder="Dirección del domicilio (para el GPS)" value={address} onChangeText={setAddress} />
-      <TextInput style={styles.input} placeholder="Hora (ej. 10:30)" value={time} onChangeText={setTime} />
 
       <Text style={styles.subtitle}>Selecciona la Fecha:</Text>
       <View style={styles.calendarContainer}>
@@ -59,6 +70,20 @@ export default function AppointmentsScreen({ navigation }: any) {
         />
       </View>
       <Text style={styles.selectedDateText}>📅 Fecha elegida: {date}</Text>
+
+      <Text style={styles.subtitle}>Selecciona la Hora (cada 15m):</Text>
+      <View style={styles.timeGrid}>
+        {timeSlots.map(t => (
+          <TouchableOpacity 
+            key={t} 
+            style={[styles.timeBtn, time === t && styles.timeBtnSelected]}
+            onPress={() => setTime(t)}
+          >
+            <Text style={time === t ? styles.textSelected : styles.textUnselected}>{t}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+      {time !== '' && <Text style={styles.selectedDateText}>⏰ Hora elegida: {time}</Text>}
 
       <Text style={styles.subtitle}>Selecciona el Servicio:</Text>
       {services.map(srv => (
@@ -87,8 +112,14 @@ const styles = StyleSheet.create({
   input: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#ddd', padding: 12, borderRadius: 8, marginBottom: 15 },
   calendarContainer: { borderRadius: 8, overflow: 'hidden', borderWidth: 1, borderColor: '#ddd', marginBottom: 10 },
   selectedDateText: { fontSize: 15, color: '#4a9b40', fontWeight: 'bold', marginBottom: 15, textAlign: 'center' },
+  
+  timeGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-start', marginBottom: 10 },
+  timeBtn: { paddingVertical: 10, paddingHorizontal: 5, backgroundColor: '#fff', borderWidth: 1, borderColor: '#ddd', borderRadius: 8, margin: 4, width: '22%', alignItems: 'center' },
+  timeBtnSelected: { backgroundColor: '#002a54', borderColor: '#002a54' },
+
   serviceBtn: { padding: 15, backgroundColor: '#fff', borderWidth: 1, borderColor: '#ddd', borderRadius: 8, marginBottom: 10 },
   serviceBtnSelected: { backgroundColor: '#002a54', borderColor: '#002a54' },
+  
   textSelected: { color: '#fff', fontWeight: 'bold' },
   textUnselected: { color: '#333' },
   saveButton: { backgroundColor: '#4a9b40', padding: 15, borderRadius: 8, alignItems: 'center', marginTop: 20, marginBottom: 40 },
