@@ -179,7 +179,7 @@ const styles = StyleSheet.create({
   dividerRow: { flexDirection: 'row', alignItems: 'center', marginVertical: 20, gap: 10 },
   dividerLine: { flex: 1, height: 1, backgroundColor: 'rgba(255,255,255,0.1)' },
   dividerText: { color: 'rgba(255,255,255,0.35)', fontSize: 12 },
-  mgmtBtn: { backgroundColor: 'rgba(52,152,219,0.15)', borderWidth: 1.5, borderColor: '#3498db', borderRadius: 14, padding: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, marginTop: 8 },
+  mgmtBtn: { backgroundColor: 'rgba(74,155,64,0.15)', borderWidth: 1.5, borderColor: '#4a9b40', borderRadius: 14, padding: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, marginTop: 8 },
   mgmtBtnTitle: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
   mgmtBtnSub: { color: 'rgba(255,255,255,0.5)', fontSize: 12, marginTop: 2 },
   pinSection: { gap: 4 },

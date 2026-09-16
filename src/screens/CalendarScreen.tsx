@@ -51,7 +51,8 @@ interface Team {
 
 export default function CalendarScreen({ route, navigation }: any) {
   const { role, teamName: userTeamName } = route?.params || { role: 'admin', teamName: null };
-  const isAdmin = role === 'admin';
+  const isAdmin = role === 'admin' || role === 'management';
+  const isStrictAdmin = role === 'admin'; // Para funciones exclusivas de admin (borrar, facturar, etc.)
 
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -976,7 +977,7 @@ export default function CalendarScreen({ route, navigation }: any) {
                 </View>
 
                 {/* BOTÓN FACTURA PDF */}
-                {isAdmin && (
+                {isStrictAdmin && (
                   <TouchableOpacity 
                     style={styles.invoiceBtn} 
                     onPress={() => generateInvoice(selectedAppointment)}
@@ -1024,7 +1025,7 @@ export default function CalendarScreen({ route, navigation }: any) {
                   </View>
                 )}
                 
-                {isAdmin && (
+                {isStrictAdmin && (
                   <TouchableOpacity style={styles.deleteApptIconBtn} onPress={() => deleteAppointment(selectedAppointment.id)}>
                     <Text style={styles.deleteApptIconBtnText}>🗑️</Text>
                   </TouchableOpacity>
