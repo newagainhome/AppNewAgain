@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, FlatList, ActivityIndicator, Image, Linking } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, FlatList, ActivityIndicator, Image, Linking, ScrollView } from 'react-native';
 import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy } from 'firebase/firestore';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import * as ImagePicker from 'expo-image-picker';
@@ -11,14 +11,17 @@ interface Expense {
   date: string;
   amount: number;
   ticketUrl?: string;
+  team?: string;
   createdAt: any;
 }
 
 export default function ExpensesScreen() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [teams, setTeams] = useState<any[]>([]);
   const [concept, setConcept] = useState('');
   const [amount, setAmount] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [selectedTeam, setSelectedTeam] = useState('Oficina/General');
   const [ticketImage, setTicketImage] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
@@ -34,6 +37,17 @@ export default function ExpensesScreen() {
       setLoading(false);
     });
     return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    const qTeams = query(collection(db, 'teams'));
+    const unsub = onSnapshot(qTeams, (snapshot) => {
+      const list: any[] = [];
+      snapshot.forEach(docSnap => list.push({ id: docSnap.id, ...docSnap.data() }));
+      list.sort((a, b) => a.name.localeCompare(b.name));
+      setTeams(list);
+    });
+    return () => unsub();
   }, []);
 
   const handleImageResult = (result: ImagePicker.ImagePickerResult) => {
@@ -91,12 +105,14 @@ export default function ExpensesScreen() {
         amount: parseFloat(amount.replace(',', '.')),
         date: date.trim(),
         ticketUrl: downloadUrl || null,
+        team: selectedTeam,
         createdAt: new Date()
       });
 
       setConcept('');
       setAmount('');
       setDate(new Date().toISOString().split('T')[0]);
+      setSelectedTeam('Oficina/General');
       setTicketImage(null);
       setUploading(false);
     } catch (error) {
@@ -151,6 +167,21 @@ export default function ExpensesScreen() {
           </TouchableOpacity>
         </View>
       </View>
+
+      <Text style={styles.label}>Asignar Gasto a:</Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.teamScrollRow}>
+        {['Oficina/General', ...teams.map(t => t.name)].map((tName) => (
+          <TouchableOpacity
+            key={tName}
+            style={[styles.teamChip, selectedTeam === tName && styles.teamChipActive]}
+            onPress={() => setSelectedTeam(tName)}
+          >
+            <Text style={selectedTeam === tName ? styles.teamChipTextActive : styles.teamChipTextInactive}>
+              {tName === 'Oficina/General' ? '🏢 General' : `🚐 ${tName}`}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
       
       {ticketImage && (
         <View style={{ alignItems: 'center', marginBottom: 15 }}>
@@ -183,6 +214,11 @@ export default function ExpensesScreen() {
               <View style={styles.expenseInfo}>
                 <Text style={styles.expenseDate}>{item.date}</Text>
                 <Text style={styles.expenseConcept}>{item.concept}</Text>
+                {item.team && item.team !== 'Oficina/General' ? (
+                  <Text style={styles.expenseTeam}>🚐 {item.team}</Text>
+                ) : (
+                  <Text style={styles.expenseTeam}>🏢 Oficina/General</Text>
+                )}
               </View>
               
               <View style={styles.expenseRight}>
@@ -213,6 +249,12 @@ const styles = StyleSheet.create({
   titleList: { fontSize: 18, fontWeight: 'bold', marginTop: 25, marginBottom: 15, color: '#d9534f' },
   formRow: { flexDirection: 'row', gap: 10, marginBottom: 10 },
   input: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#ddd', padding: 12, borderRadius: 8, fontSize: 15 },
+  label: { fontSize: 13, fontWeight: 'bold', color: '#555', marginBottom: 6, marginTop: 4 },
+  teamScrollRow: { marginBottom: 15, maxHeight: 40 },
+  teamChip: { paddingVertical: 8, paddingHorizontal: 12, borderRadius: 20, borderWidth: 1, borderColor: '#ddd', backgroundColor: '#fff', marginRight: 8, height: 35, justifyContent: 'center' },
+  teamChipActive: { backgroundColor: '#d9534f', borderColor: '#d9534f' },
+  teamChipTextActive: { color: '#fff', fontWeight: 'bold', fontSize: 13 },
+  teamChipTextInactive: { color: '#555', fontSize: 13 },
   photoBtnSmall: { flex: 1, backgroundColor: '#f0f4f8', borderWidth: 1, borderColor: '#dbe2ea', paddingVertical: 12, paddingHorizontal: 5, borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
   photoBtnText: { color: '#002a54', fontWeight: 'bold', fontSize: 13 },
   previewImg: { width: 100, height: 100, borderRadius: 8, alignSelf: 'center', marginBottom: 5 },
@@ -222,6 +264,7 @@ const styles = StyleSheet.create({
   expenseInfo: { flex: 1 },
   expenseDate: { fontSize: 12, color: '#777', fontWeight: 'bold', marginBottom: 2 },
   expenseConcept: { fontSize: 15, fontWeight: 'bold', color: '#333' },
+  expenseTeam: { fontSize: 12, color: '#555', marginTop: 4, fontStyle: 'italic' },
   expenseRight: { alignItems: 'flex-end' },
   expenseAmount: { fontSize: 16, fontWeight: 'bold', color: '#d9534f', marginBottom: 6 },
   cardActions: { flexDirection: 'row', gap: 8, alignItems: 'center' },

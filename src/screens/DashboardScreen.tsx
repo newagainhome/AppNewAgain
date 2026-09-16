@@ -120,14 +120,16 @@ export default function DashboardScreen() {
     });
   }, [appointments, dateRange, selectedTeam]);
 
-  // Gastos filtrados por Fecha (los gastos no tienen equipo asociado en este momento)
+  // Gastos filtrados por Fecha y Equipo
   const filteredExpenses = useMemo(() => {
     return expenses.filter((exp) => {
       const expDate = exp.date;
       if (!expDate) return false;
-      return expDate >= dateRange.start && expDate <= dateRange.end;
+      const inDateRange = expDate >= dateRange.start && expDate <= dateRange.end;
+      const matchTeam = selectedTeam === 'Todos' ? true : (exp.team || 'Oficina/General') === selectedTeam;
+      return inDateRange && matchTeam;
     });
-  }, [expenses, dateRange]);
+  }, [expenses, dateRange, selectedTeam]);
 
   // 1. CÁLCULO DE FINANZAS (Facturación - Gastos = Beneficio)
   const billingStats = useMemo(() => {
@@ -266,7 +268,7 @@ export default function DashboardScreen() {
     return { totalClients, newClients };
   }, [clients, dateRange]);
 
-  const activeTeamsList = ['Todos', ...(teams.length > 0 ? teams.map(t => t.name) : ['Equipo 1', 'Equipo 2'])];
+  const activeTeamsList = ['Todos', 'Oficina/General', ...(teams.length > 0 ? teams.map(t => t.name) : ['Equipo 1', 'Equipo 2'])];
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
@@ -333,7 +335,7 @@ export default function DashboardScreen() {
               onPress={() => setSelectedTeam(t)}
             >
               <Text style={selectedTeam === t ? styles.teamChipTextActive : styles.teamChipTextInactive}>
-                {t === 'Todos' ? '🌐 Todos los Equipos' : `🚐 ${t}`}
+                {t === 'Todos' ? '🌐 Todos los Equipos' : t === 'Oficina/General' ? '🏢 General' : `🚐 ${t}`}
               </Text>
             </TouchableOpacity>
           ))}
