@@ -1,17 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, Linking, Alert } from 'react-native';
 import { Calendar } from 'react-native-calendars';
-import { collection, onSnapshot, query, where } from 'firebase/firestore';
+import { collection, onSnapshot, query, where, doc, deleteDoc } from 'firebase/firestore';
 import { db } from '../config/firebase';
 
 interface Appointment {
-  id: string; client: string; date: string; time: string; serviceName: string; duration: string; address?: string;
+  id: string; client: string; date: string; time: string; serviceName: string; duration: string; address?: string; team?: string;
 }
 
 export default function CalendarScreen({ navigation }: any) {
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
-  const [conflicts, setConflicts] = useState<Record<string, string>>({}); // Guarda las alertas de tiempo
+  const [conflicts, setConflicts] = useState<Record<string, string>>({}); 
 
   const getMinutes = (timeStr: string) => {
     const [h, m] = timeStr.split(':').map(Number);
@@ -24,33 +24,32 @@ export default function CalendarScreen({ navigation }: any) {
       const appsList: Appointment[] = [];
       snapshot.forEach((doc) => appsList.push({ id: doc.id, ...doc.data() } as Appointment));
       
-      // 1. Ordenar citas cronológicamente
       appsList.sort((a, b) => a.time.localeCompare(b.time));
       
-      // 2. Analizar conflictos y tiempos de ruta
       const newConflicts: Record<string, string> = {};
       
-      for (let i = 0; i < appsList.length - 1; i++) {
-        const current = appsList[i];
-        const next = appsList[i + 1];
+      // Separar por equipos para calcular conflictos independientes
+      const teams = ['Equipo 1', 'Equipo 2', 'Equipo 3'];
+      
+      teams.forEach(teamName => {
+        const teamApps = appsList.filter(a => (a.team || 'Equipo 1') === teamName);
         
-        const currentEndTimeMins = getMinutes(current.time) + parseInt(current.duration || '0');
-        const nextStartTimeMins = getMinutes(next.time);
-        
-        // Tiempo libre entre que acaba un servicio y empieza el siguiente
-        const freeTimeMins = nextStartTimeMins - currentEndTimeMins;
-        
-        // NOTA: Aquí asumo 30 min de viaje por defecto. 
-        // Si pones tu API Key de Google Maps, calcularía el tiempo real con tráfico.
-        const estimatedTravelTime = 30; 
+        for (let i = 0; i < teamApps.length - 1; i++) {
+          const current = teamApps[i];
+          const next = teamApps[i + 1];
+          const currentEndTimeMins = getMinutes(current.time) + parseInt(current.duration || '0');
+          const nextStartTimeMins = getMinutes(next.time);
+          const freeTimeMins = nextStartTimeMins - currentEndTimeMins;
+          const estimatedTravelTime = 30; 
 
-        if (freeTimeMins < 0) {
-           newConflicts[next.id] = `⚠️ Solapamiento: La cita anterior termina a las ${Math.floor(currentEndTimeMins/60)}:${(currentEndTimeMins%60).toString().padStart(2,'0')}.`;
-        } else if (freeTimeMins < estimatedTravelTime) {
-           newConflicts[next.id] = `🚗 ¡Ojo! Solo tienes ${freeTimeMins} min para viajar desde la cita anterior (Recomendado: ${estimatedTravelTime} min).`;
+          if (freeTimeMins < 0) {
+             newConflicts[next.id] = `⚠️ Solapamiento en ${teamName}: La cita anterior acaba a las ${Math.floor(currentEndTimeMins/60)}:${(currentEndTimeMins%60).toString().padStart(2,'0')}.`;
+          } else if (freeTimeMins < estimatedTravelTime) {
+             newConflicts[next.id] = `🚗 ¡Ojo ${teamName}! Solo hay ${freeTimeMins} min para llegar.`;
+          }
         }
-      }
-
+      });
+      
       setConflicts(newConflicts);
       setAppointments(appsList);
     });
@@ -60,6 +59,16 @@ export default function CalendarScreen({ navigation }: any) {
   const openMaps = (address: string | undefined) => {
     if (!address) return Alert.alert("Aviso", "Esta cita no tiene dirección.");
     Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`);
+  };
+
+  const deleteAppointment = async (id: string) => {
+    if (window.confirm("¿Estás completamente seguro de que deseas eliminar esta cita?")) {
+      try {
+        await deleteDoc(doc(db, 'appointments', id));
+      } catch (error) {
+        alert("Hubo un error al intentar eliminar la cita.");
+      }
+    }
   };
 
   return (
@@ -83,8 +92,16 @@ export default function CalendarScreen({ navigation }: any) {
         renderItem={({ item }) => (
           <View style={styles.card}>
             <View style={styles.cardHeader}>
-              <Text style={styles.time}>{item.time} (🕒 {item.duration}m)</Text>
-              <Text style={styles.service}>{item.serviceName}</Text>
+              <View>
+                <View style={styles.teamBadge}>
+                  <Text style={styles.teamBadgeText}>{item.team || 'Equipo 1'}</Text>
+                </View>
+                <Text style={styles.time}>{item.time} (🕒 {item.duration}m)</Text>
+                <Text style={styles.service}>{item.serviceName}</Text>
+              </View>
+              <TouchableOpacity onPress={() => deleteAppointment(item.id)}>
+                <Text style={styles.deleteIcon}>🗑️</Text>
+              </TouchableOpacity>
             </View>
             <Text style={styles.client}>👤 {item.client}</Text>
             
@@ -114,10 +131,13 @@ const styles = StyleSheet.create({
   button: { backgroundColor: '#4a9b40', padding: 10, borderRadius: 8 },
   buttonText: { color: '#fff', fontWeight: 'bold' },
   card: { backgroundColor: '#fff', marginHorizontal: 15, marginBottom: 15, padding: 15, borderRadius: 8, elevation: 1, borderLeftWidth: 4, borderLeftColor: '#002a54' },
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 5 },
+  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 5 },
+  teamBadge: { backgroundColor: '#e3f2fd', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4, alignSelf: 'flex-start', marginBottom: 5 },
+  teamBadgeText: { color: '#002a54', fontWeight: 'bold', fontSize: 12 },
   time: { fontWeight: 'bold', color: '#002a54', fontSize: 16 },
+  service: { color: '#4a9b40', fontWeight: 'bold', marginTop: 3 },
+  deleteIcon: { fontSize: 20, padding: 5 },
   client: { fontSize: 16, marginBottom: 10, color: '#333' },
-  service: { color: '#4a9b40', fontWeight: 'bold', marginBottom: 10 },
   conflictBanner: { backgroundColor: '#ffe5e5', padding: 10, borderRadius: 5, marginBottom: 10, borderWidth: 1, borderColor: '#ffcccc' },
   conflictText: { color: '#d9534f', fontWeight: 'bold', fontSize: 13 },
   mapButton: { backgroundColor: '#eef2f5', padding: 12, borderRadius: 6, alignItems: 'center', borderWidth: 1, borderColor: '#d0d7de' },
