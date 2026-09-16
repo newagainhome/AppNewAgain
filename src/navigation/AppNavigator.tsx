@@ -1,5 +1,5 @@
 import React from 'react';
-import { Image, View } from 'react-native';
+import { Image, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { NavigationContainer } from '@react-navigation/native';
@@ -13,9 +13,9 @@ const Stack = createNativeStackNavigator();
 
 function LogoTitle() {
   return (
-    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingBottom: 5 }}>
+    <View style={styles.logoContainer}>
       <Image
-        style={{ width: 140, height: 40 }}
+        style={styles.logoImage}
         source={require('../../assets/logo.jpg')}
         resizeMode="contain"
       />
@@ -23,18 +23,60 @@ function LogoTitle() {
   );
 }
 
+// Barra de pestañas 100% personalizada para garantizar visibilidad total en web
+function CustomTopTabBar({ state, descriptors, navigation }: any) {
+  return (
+    <View style={styles.tabContainer}>
+      {state.routes.map((route: any, index: number) => {
+        const { options } = descriptors[route.key];
+        const label =
+          options.tabBarLabel !== undefined
+            ? options.tabBarLabel
+            : options.title !== undefined
+            ? options.title
+            : route.name;
+
+        const isFocused = state.index === index;
+
+        const onPress = () => {
+          const event = navigation.emit({
+            type: 'tabPress',
+            target: route.key,
+            canPreventDefault: true,
+          });
+
+          if (!isFocused && !event.defaultPrevented) {
+            navigation.navigate(route.name);
+          }
+        };
+
+        return (
+          <TouchableOpacity
+            key={route.key}
+            onPress={onPress}
+            style={[
+              styles.tabButton,
+              isFocused ? styles.tabButtonActive : styles.tabButtonInactive
+            ]}
+          >
+            <Text
+              style={[
+                styles.tabText,
+                isFocused ? styles.tabTextActive : styles.tabTextInactive
+              ]}
+            >
+              {label}
+            </Text>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+}
+
 function TopTabs() {
   return (
-    <Tab.Navigator
-      screenOptions={{
-        tabBarActiveTintColor: '#002a54', // Azul marino corporativo (Texto Pestaña Activa)
-        tabBarInactiveTintColor: '#888888', // Gris oscuro (Texto Pestaña Inactiva)
-        tabBarStyle: { backgroundColor: '#ffffff', borderBottomWidth: 1, borderBottomColor: '#dddddd' }, // Fondo blanco para máxima lectura
-        tabBarIndicatorStyle: { backgroundColor: '#4a9b40', height: 4 }, // Raya verde
-        tabBarLabelStyle: { fontWeight: 'bold', fontSize: 15, textTransform: 'none' }, // Letra grande y clara
-        tabBarItemStyle: { paddingVertical: 10 } // Espaciado cómodo, sin forzar alturas
-      }}
-    >
+    <Tab.Navigator tabBar={(props) => <CustomTopTabBar {...props} />}>
       <Tab.Screen name="Calendar" component={CalendarScreen} options={{ tabBarLabel: 'Calendario' }} />
       <Tab.Screen name="Route" component={RouteScreen} options={{ tabBarLabel: 'Rutas' }} />
       <Tab.Screen name="Appointments" component={AppointmentsScreen} options={{ tabBarLabel: 'Nueva Cita' }} />
@@ -58,3 +100,50 @@ export default function AppNavigator() {
     </NavigationContainer>
   );
 }
+
+const styles = StyleSheet.create({
+  logoContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingBottom: 5 },
+  logoImage: { width: 140, height: 40 },
+  tabContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#ffffff',
+    borderBottomWidth: 2,
+    borderBottomColor: '#e0e0e0',
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowOffset: { width: 0, height: 2 }
+  },
+  tabButton: {
+    flex: 1,
+    paddingVertical: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderBottomWidth: 4,
+    borderBottomColor: 'transparent'
+  },
+  tabButtonActive: {
+    borderBottomColor: '#4a9b40', // Verde de la marca para la pestaña activa
+    backgroundColor: '#f4f8fb'
+  },
+  tabButtonInactive: {
+    borderBottomColor: 'transparent',
+    backgroundColor: '#ffffff'
+  },
+  tabText: {
+    color: '#002a54', // AZUL MARINO EN TODAS LAS PESTAÑAS
+    fontWeight: 'bold', // EN NEGRITA
+    fontSize: 15,
+    textAlign: 'center'
+  },
+  tabTextActive: {
+    color: '#002a54',
+    fontWeight: 'bold',
+    opacity: 1
+  },
+  tabTextInactive: {
+    color: '#002a54',
+    fontWeight: 'bold',
+    opacity: 0.65 // Azul más suave cuando no está seleccionada para diferenciar
+  }
+});
