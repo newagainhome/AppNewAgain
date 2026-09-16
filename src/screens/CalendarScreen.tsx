@@ -9,13 +9,16 @@ import {
   Modal,
   Linking,
   Image,
-  ActivityIndicator
+  ActivityIndicator,
+  Platform
 } from 'react-native';
 import { Calendar } from 'react-native-calendars';
 import { collection, onSnapshot, query, where, doc, deleteDoc, addDoc, updateDoc } from 'firebase/firestore';
 import { db, storage } from '../config/firebase';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import * as ImagePicker from 'expo-image-picker';
+import * as Print from 'expo-print';
+import * as Sharing from 'expo-sharing';
 
 interface Appointment {
   id: string;
@@ -374,6 +377,107 @@ export default function CalendarScreen({ navigation }: any) {
     }
   };
 
+  const generateInvoice = async (app: Appointment) => {
+    const priceNet = parseFloat(app.price || '0');
+    const vat = priceNet * 0.21;
+    const total = priceNet + vat;
+    const dateStr = app.date || new Date().toISOString().split('T')[0];
+  
+    const html = `
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <style>
+            body { font-family: 'Helvetica', sans-serif; padding: 40px; color: #333; }
+            .header { display: flex; justify-content: space-between; border-bottom: 2px solid #002a54; padding-bottom: 20px; margin-bottom: 30px; }
+            .logo { font-size: 32px; font-weight: bold; color: #002a54; }
+            .logo span { color: #4a9b40; }
+            .company-details { text-align: right; font-size: 14px; color: #555; line-height: 1.5; }
+            .invoice-title { font-size: 28px; color: #333; margin-top: 0; }
+            .client-section { margin-bottom: 40px; }
+            .client-section h3 { color: #4a9b40; border-bottom: 1px solid #eee; padding-bottom: 5px; }
+            table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
+            th { background-color: #f0f4f8; color: #002a54; padding: 12px; text-align: left; border-bottom: 2px solid #dbe2ea; }
+            td { padding: 12px; border-bottom: 1px solid #eee; }
+            .totals-section { float: right; width: 300px; }
+            .totals-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #eee; }
+            .totals-row.grand-total { font-weight: bold; font-size: 18px; color: #002a54; border-bottom: none; border-top: 2px solid #002a54; padding-top: 12px; margin-top: 5px; }
+            .footer { margin-top: 80px; text-align: center; font-size: 12px; color: #888; border-top: 1px solid #eee; padding-top: 20px; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div class="logo">NEW<span>AGAIN</span></div>
+            <div class="company-details">
+              <strong>InnovaNor Servicios S.L.</strong><br>
+              B-12345678<br>
+              info@newagain.es<br>
+              +34 600 000 000
+            </div>
+          </div>
+          
+          <h1 class="invoice-title">FACTURA</h1>
+          
+          <div class="client-section">
+            <h3>Datos del Cliente</h3>
+            <p>
+              <strong>Nombre:</strong> ${app.client}<br>
+              <strong>Fecha del servicio:</strong> ${dateStr}<br>
+              <strong>Ref. Servicio:</strong> #${app.id.substring(0, 8).toUpperCase()}
+            </p>
+          </div>
+  
+          <table>
+            <thead>
+              <tr>
+                <th>Concepto / Servicio</th>
+                <th>Base Imponible</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>${app.serviceName}</td>
+                <td>${priceNet.toFixed(2)} €</td>
+              </tr>
+            </tbody>
+          </table>
+  
+          <div class="totals-section">
+            <div class="totals-row">
+              <span>Subtotal (Base Imponible)</span>
+              <span>${priceNet.toFixed(2)} €</span>
+            </div>
+            <div class="totals-row">
+              <span>IVA (21%)</span>
+              <span>${vat.toFixed(2)} €</span>
+            </div>
+            <div class="totals-row grand-total">
+              <span>TOTAL FACTURA</span>
+              <span>${total.toFixed(2)} €</span>
+            </div>
+          </div>
+          
+          <div style="clear: both;"></div>
+          
+          <div class="footer">
+            Gracias por confiar en NewAgain. Este documento es una factura válida.
+          </div>
+        </body>
+      </html>
+    `;
+  
+    try {
+      const { uri } = await Print.printToFileAsync({ html });
+      if (Platform.OS === 'web') {
+        window.open(uri, '_blank');
+      } else {
+        await Sharing.shareAsync(uri);
+      }
+    } catch (error) {
+      alert('Error al generar la factura');
+    }
+  };
+
   return (
     <View style={styles.container}>
       {/* Barra superior de herramientas */}
@@ -588,6 +692,14 @@ export default function CalendarScreen({ navigation }: any) {
                     )}
                   </View>
                 </View>
+
+                {/* BOTÓN FACTURA PDF */}
+                <TouchableOpacity 
+                  style={styles.invoiceBtn} 
+                  onPress={() => generateInvoice(selectedAppointment)}
+                >
+                  <Text style={styles.invoiceBtnText}>📄 Generar Factura (PDF)</Text>
+                </TouchableOpacity>
 
                 {selectedAppointment.phone ? (
                   <TouchableOpacity 
@@ -941,5 +1053,9 @@ const styles = StyleSheet.create({
   completedBadge: { flex: 1, backgroundColor: '#eafaf1', paddingVertical: 14, borderRadius: 8, alignItems: 'center', borderWidth: 1, borderColor: '#2ecc71' },
   completedBadgeText: { color: '#27ae60', fontWeight: 'bold', fontSize: 15 },
   deleteApptIconBtn: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#d9534f', width: 50, borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
-  deleteApptIconBtnText: { fontSize: 20 }
+  deleteApptIconBtnText: { fontSize: 20 },
+  
+  // Estilo para el botón de Factura PDF
+  invoiceBtn: { backgroundColor: '#fdf7e3', paddingVertical: 12, borderRadius: 8, alignItems: 'center', marginTop: 15, borderWidth: 1, borderColor: '#fde68a' },
+  invoiceBtnText: { color: '#b45309', fontWeight: 'bold', fontSize: 14 }
 });
