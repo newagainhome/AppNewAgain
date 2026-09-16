@@ -7,11 +7,15 @@ import {
   TouchableOpacity,
   TextInput,
   Modal,
-  Linking
+  Linking,
+  Image,
+  ActivityIndicator
 } from 'react-native';
 import { Calendar } from 'react-native-calendars';
 import { collection, onSnapshot, query, where, doc, deleteDoc, addDoc, updateDoc } from 'firebase/firestore';
-import { db } from '../config/firebase';
+import { db, storage } from '../config/firebase';
+import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
+import * as ImagePicker from 'expo-image-picker';
 
 interface Appointment {
   id: string;
@@ -26,6 +30,7 @@ interface Appointment {
   detailedInfo?: string;
   team?: string;
   reminderSent?: boolean;
+  photos?: string[];
 }
 
 interface Team {
@@ -42,9 +47,10 @@ export default function CalendarScreen({ navigation }: any) {
   const [teams, setTeams] = useState<Team[]>([]);
   const [conflicts, setConflicts] = useState<Record<string, string>>({});
   
-  // Recordatorios
+  // Recordatorios y Fotos
   const [pendingReminders, setPendingReminders] = useState<number>(0);
   const [tomorrowDateStr, setTomorrowDateStr] = useState<string>('');
+  const [uploadingPhotos, setUploadingPhotos] = useState<Record<string, boolean>>({});
   
   // Modal de gestión de equipos
   const [showTeamsModal, setShowTeamsModal] = useState(false);
@@ -183,6 +189,42 @@ export default function CalendarScreen({ navigation }: any) {
       Linking.openURL(url);
     } catch(e) {
       alert('Error al actualizar el estado del recordatorio.');
+    }
+  };
+
+  const pickAndUploadImage = async (appointmentId: string) => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        quality: 0.3, // Compresión automática al 30%
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        setUploadingPhotos(prev => ({ ...prev, [appointmentId]: true }));
+        
+        const uri = result.assets[0].uri;
+        const response = await fetch(uri);
+        const blob = await response.blob();
+        
+        const fileName = `appointments/${appointmentId}/${Date.now()}.jpg`;
+        const storageRef = ref(storage, fileName);
+        
+        await uploadBytesResumable(storageRef, blob);
+        const downloadUrl = await getDownloadURL(storageRef);
+        
+        const appDoc = appointments.find(a => a.id === appointmentId);
+        const currentPhotos = appDoc?.photos || [];
+        await updateDoc(doc(db, 'appointments', appointmentId), {
+          photos: [...currentPhotos, downloadUrl]
+        });
+        
+        setUploadingPhotos(prev => ({ ...prev, [appointmentId]: false }));
+      }
+    } catch (error) {
+      console.error(error);
+      alert('Error al subir la imagen. Inténtalo de nuevo.');
+      setUploadingPhotos(prev => ({ ...prev, [appointmentId]: false }));
     }
   };
 
@@ -408,6 +450,31 @@ export default function CalendarScreen({ navigation }: any) {
                         ) : null}
                       </View>
                     ) : null}
+
+                    {/* SECCIÓN DE FOTOS ANTES/DESPUÉS */}
+                    <View style={styles.photosSection}>
+                      <Text style={styles.photosTitle}>📸 Fotografías (Antes/Después):</Text>
+                      <View style={styles.photosRow}>
+                        {item.photos && item.photos.map((photoUrl, idx) => (
+                          <TouchableOpacity key={idx} onPress={() => Linking.openURL(photoUrl)}>
+                            <Image source={{ uri: photoUrl }} style={styles.thumbnailImg} />
+                          </TouchableOpacity>
+                        ))}
+                        
+                        {uploadingPhotos[item.id] ? (
+                          <View style={styles.uploadingBox}>
+                            <ActivityIndicator size="small" color="#4a9b40" />
+                          </View>
+                        ) : (
+                          <TouchableOpacity 
+                            style={styles.addPhotoBtn} 
+                            onPress={() => pickAndUploadImage(item.id)}
+                          >
+                            <Text style={styles.addPhotoBtnText}>+</Text>
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                    </View>
 
                     {item.phone ? (
                       <TouchableOpacity 
@@ -713,5 +780,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#dcdcdc'
   },
-  whatsappSentText: { color: '#555', fontWeight: 'bold' }
+  whatsappSentText: { color: '#555', fontWeight: 'bold' },
+  
+  // Estilos de Fotografías
+  photosSection: { marginTop: 12, borderTopWidth: 1, borderTopColor: '#eee', paddingTop: 10 },
+  photosTitle: { fontSize: 13, fontWeight: 'bold', color: '#002a54', marginBottom: 8 },
+  photosRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  thumbnailImg: { width: 60, height: 60, borderRadius: 8, borderWidth: 1, borderColor: '#ddd' },
+  uploadingBox: { width: 60, height: 60, borderRadius: 8, backgroundColor: '#f0f0f0', justifyContent: 'center', alignItems: 'center' },
+  addPhotoBtn: { width: 60, height: 60, borderRadius: 8, backgroundColor: '#eef7ee', borderWidth: 1, borderColor: '#c5e6c5', justifyContent: 'center', alignItems: 'center', borderStyle: 'dashed' },
+  addPhotoBtnText: { fontSize: 24, color: '#4a9b40' }
 });
