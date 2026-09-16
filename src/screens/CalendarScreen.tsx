@@ -382,87 +382,242 @@ export default function CalendarScreen({ navigation }: any) {
     const vat = priceNet * 0.21;
     const total = priceNet + vat;
     const dateStr = app.date || new Date().toISOString().split('T')[0];
+    const invoiceNum = `F-${new Date().getFullYear()}-${app.id.substring(0, 5).toUpperCase()}`;
+    const emitDate = new Date().toLocaleDateString('es-ES');
   
     const html = `
-      <html>
-        <head>
-          <meta charset="utf-8">
-          <style>
-            body { font-family: 'Helvetica', sans-serif; padding: 40px; color: #333; }
-            .header { display: flex; justify-content: space-between; border-bottom: 2px solid #002a54; padding-bottom: 20px; margin-bottom: 30px; }
-            .logo { font-size: 32px; font-weight: bold; color: #002a54; }
-            .logo span { color: #4a9b40; }
-            .company-details { text-align: right; font-size: 14px; color: #555; line-height: 1.5; }
-            .invoice-title { font-size: 28px; color: #333; margin-top: 0; }
-            .client-section { margin-bottom: 40px; }
-            .client-section h3 { color: #4a9b40; border-bottom: 1px solid #eee; padding-bottom: 5px; }
-            table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
-            th { background-color: #f0f4f8; color: #002a54; padding: 12px; text-align: left; border-bottom: 2px solid #dbe2ea; }
-            td { padding: 12px; border-bottom: 1px solid #eee; }
-            .totals-section { float: right; width: 300px; }
-            .totals-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #eee; }
-            .totals-row.grand-total { font-weight: bold; font-size: 18px; color: #002a54; border-bottom: none; border-top: 2px solid #002a54; padding-top: 12px; margin-top: 5px; }
-            .footer { margin-top: 80px; text-align: center; font-size: 12px; color: #888; border-top: 1px solid #eee; padding-top: 20px; }
-          </style>
-        </head>
-        <body>
+      <!DOCTYPE html>
+      <html lang="es">
+      <head>
+      <meta charset="UTF-8">
+      <style>
+        @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap');
+        
+        body {
+          font-family: 'Montserrat', sans-serif;
+          color: #333;
+          background: #fff;
+          margin: 0;
+          padding: 0;
+        }
+        .invoice-box {
+          max-width: 800px;
+          margin: auto;
+          padding: 40px;
+          font-size: 14px;
+          line-height: 24px;
+        }
+        .header {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          margin-bottom: 40px;
+        }
+        .logo-container {
+          display: flex;
+          flex-direction: column;
+        }
+        .logo {
+          font-size: 38px;
+          font-weight: 900;
+          color: #002a54;
+          letter-spacing: -1px;
+          margin-bottom: 5px;
+        }
+        .logo span { color: #4a9b40; }
+        .slogan { font-size: 11px; color: #777; text-transform: uppercase; letter-spacing: 2px; }
+        
+        .invoice-details {
+          text-align: right;
+        }
+        .invoice-details h1 {
+          margin: 0;
+          color: #002a54;
+          font-size: 36px;
+          font-weight: 700;
+          text-transform: uppercase;
+        }
+        .invoice-details p {
+          margin: 2px 0;
+          color: #555;
+          font-size: 13px;
+        }
+        .invoice-details strong { color: #333; }
+        
+        .details-grid {
+          display: flex;
+          justify-content: space-between;
+          margin-bottom: 40px;
+          background: #f8fafd;
+          padding: 20px;
+          border-radius: 8px;
+          border-left: 4px solid #002a54;
+        }
+        .details-col h3 {
+          margin-top: 0;
+          color: #002a54;
+          font-size: 14px;
+          text-transform: uppercase;
+          margin-bottom: 10px;
+        }
+        .details-col p { margin: 2px 0; font-size: 13px; color: #444; }
+        
+        table {
+          width: 100%;
+          border-collapse: collapse;
+          margin-bottom: 30px;
+        }
+        table th {
+          background: #002a54;
+          color: #fff;
+          padding: 12px 15px;
+          text-align: left;
+          font-size: 13px;
+          text-transform: uppercase;
+        }
+        table th:last-child { text-align: right; }
+        table td {
+          padding: 15px;
+          border-bottom: 1px solid #eee;
+          font-size: 14px;
+          color: #333;
+        }
+        table td:last-child { text-align: right; font-weight: 600; }
+        table tr:nth-child(even) td { background: #fafafa; }
+        
+        .totals-container {
+          display: flex;
+          justify-content: flex-end;
+          margin-bottom: 50px;
+        }
+        .totals-box {
+          width: 350px;
+        }
+        .totals-row {
+          display: flex;
+          justify-content: space-between;
+          padding: 10px 15px;
+          font-size: 14px;
+          color: #555;
+        }
+        .totals-row.border-bottom {
+          border-bottom: 1px solid #eee;
+        }
+        .totals-row.grand-total {
+          background: #002a54;
+          color: #fff;
+          font-size: 18px;
+          font-weight: 700;
+          border-radius: 4px;
+          margin-top: 10px;
+        }
+        
+        .payment-info {
+          background: #f9f9f9;
+          padding: 20px;
+          border-radius: 8px;
+          font-size: 12px;
+          color: #555;
+        }
+        .payment-info h4 {
+          margin: 0 0 10px 0;
+          color: #002a54;
+          font-size: 14px;
+          text-transform: uppercase;
+        }
+        .payment-info p { margin: 4px 0; }
+        
+        .footer {
+          margin-top: 40px;
+          text-align: center;
+          font-size: 11px;
+          color: #999;
+          border-top: 1px solid #eee;
+          padding-top: 20px;
+        }
+      </style>
+      </head>
+      <body>
+        <div class="invoice-box">
+          
           <div class="header">
-            <div class="logo">NEW<span>AGAIN</span></div>
-            <div class="company-details">
-              <strong>InnovaNor Servicios S.L.</strong><br>
-              B-12345678<br>
-              info@newagain.es<br>
-              +34 600 000 000
+            <div class="logo-container">
+              <div class="logo">NEW<span>AGAIN</span></div>
+              <div class="slogan">Limpieza Profesional de Vehículos y Tapicerías</div>
+            </div>
+            <div class="invoice-details">
+              <h1>FACTURA</h1>
+              <p><strong>Nº Factura:</strong> ${invoiceNum}</p>
+              <p><strong>Fecha de Emisión:</strong> ${emitDate}</p>
             </div>
           </div>
           
-          <h1 class="invoice-title">FACTURA</h1>
-          
-          <div class="client-section">
-            <h3>Datos del Cliente</h3>
-            <p>
-              <strong>Nombre:</strong> ${app.client}<br>
-              <strong>Fecha del servicio:</strong> ${dateStr}<br>
-              <strong>Ref. Servicio:</strong> #${app.id.substring(0, 8).toUpperCase()}
-            </p>
+          <div class="details-grid">
+            <div class="details-col">
+              <h3>Datos del Emisor</h3>
+              <p><strong>InnovaNor Servicios S.L.</strong></p>
+              <p>CIF: B-12345678</p>
+              <p>Polígono Industrial, Nave 4</p>
+              <p>28000 Madrid, España</p>
+              <p>info@newagain.es | +34 600 000 000</p>
+            </div>
+            <div class="details-col" style="text-align: right;">
+              <h3>Datos del Cliente</h3>
+              <p><strong>${app.client}</strong></p>
+              <p>${app.address ? app.address : 'Dirección no especificada'}</p>
+              <p>${app.phone ? app.phone : ''}</p>
+            </div>
           </div>
-  
+      
           <table>
             <thead>
               <tr>
-                <th>Concepto / Servicio</th>
-                <th>Base Imponible</th>
+                <th style="width: 70%;">DESCRIPCIÓN DEL SERVICIO</th>
+                <th style="text-align: center;">CANT.</th>
+                <th>IMPORTE</th>
               </tr>
             </thead>
             <tbody>
               <tr>
-                <td>${app.serviceName}</td>
+                <td>
+                  <strong>${app.serviceName}</strong><br>
+                  <span style="font-size: 12px; color: #777;">Servicio realizado el ${dateStr}</span>
+                </td>
+                <td style="text-align: center;">1</td>
                 <td>${priceNet.toFixed(2)} €</td>
               </tr>
             </tbody>
           </table>
-  
-          <div class="totals-section">
-            <div class="totals-row">
-              <span>Subtotal (Base Imponible)</span>
-              <span>${priceNet.toFixed(2)} €</span>
-            </div>
-            <div class="totals-row">
-              <span>IVA (21%)</span>
-              <span>${vat.toFixed(2)} €</span>
-            </div>
-            <div class="totals-row grand-total">
-              <span>TOTAL FACTURA</span>
-              <span>${total.toFixed(2)} €</span>
+      
+          <div class="totals-container">
+            <div class="totals-box">
+              <div class="totals-row border-bottom">
+                <span>Base Imponible</span>
+                <span>${priceNet.toFixed(2)} €</span>
+              </div>
+              <div class="totals-row border-bottom">
+                <span>IVA (21%)</span>
+                <span>${vat.toFixed(2)} €</span>
+              </div>
+              <div class="totals-row grand-total">
+                <span>TOTAL A PAGAR</span>
+                <span>${total.toFixed(2)} €</span>
+              </div>
             </div>
           </div>
-          
-          <div style="clear: both;"></div>
-          
+      
+          <div class="payment-info">
+            <h4>MÉTODOS DE PAGO Y CONDICIONES</h4>
+            <p><strong>Transferencia Bancaria:</strong> ES21 0000 1111 2222 3333 4444 (Banco Santander)</p>
+            <p><strong>Bizum:</strong> +34 600 000 000</p>
+            <p>Por favor, indique el número de factura <strong>(${invoiceNum})</strong> en el concepto del pago.</p>
+          </div>
+      
           <div class="footer">
-            Gracias por confiar en NewAgain. Este documento es una factura válida.
+            Documento generado automáticamente por NewAgain System. Gracias por confiar en nosotros.
           </div>
-        </body>
+        </div>
+      </body>
       </html>
     `;
   
