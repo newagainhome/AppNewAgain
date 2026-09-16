@@ -6,7 +6,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import CalendarScreen from '../screens/CalendarScreen';
 import AppointmentsScreen from '../screens/AppointmentsScreen';
 import ServicesScreen from '../screens/ServicesScreen';
-import RouteScreen from '../screens/RouteScreen'; // Importamos la nueva pantalla
+import RouteScreen from '../screens/RouteScreen';
 
 const Tab = createMaterialTopTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -27,11 +27,12 @@ function TopTabs() {
   return (
     <Tab.Navigator
       screenOptions={{
-        tabBarActiveTintColor: '#4a9b40',
-        tabBarInactiveTintColor: '#ffffff',
-        tabBarStyle: { backgroundColor: '#002a54', height: 55, justifyContent: 'center' },
-        tabBarIndicatorStyle: { backgroundColor: '#4a9b40', height: 4 },
-        tabBarLabelStyle: { fontWeight: 'bold', fontSize: 14, textTransform: 'none', marginTop: 10 }
+        tabBarActiveTintColor: '#002a54', // Azul marino corporativo (Texto Pestaña Activa)
+        tabBarInactiveTintColor: '#888888', // Gris oscuro (Texto Pestaña Inactiva)
+        tabBarStyle: { backgroundColor: '#ffffff', borderBottomWidth: 1, borderBottomColor: '#dddddd' }, // Fondo blanco para máxima lectura
+        tabBarIndicatorStyle: { backgroundColor: '#4a9b40', height: 4 }, // Raya verde
+        tabBarLabelStyle: { fontWeight: 'bold', fontSize: 15, textTransform: 'none' }, // Letra grande y clara
+        tabBarItemStyle: { paddingVertical: 10 } // Espaciado cómodo, sin forzar alturas
       }}
     >
       <Tab.Screen name="Calendar" component={CalendarScreen} options={{ tabBarLabel: 'Calendario' }} />
