@@ -38,6 +38,7 @@ interface Appointment {
   startedAt?: string;
   completedAt?: string;
   delayMinutes?: number;
+  reviewRequested?: boolean;
 }
 
 interface Team {
@@ -203,6 +204,30 @@ export default function CalendarScreen({ route, navigation }: any) {
       Linking.openURL(url);
     } catch(e) {
       alert('Error al actualizar el estado del recordatorio.');
+    }
+  };
+
+  const requestGoogleReview = async (item: Appointment) => {
+    if (!item.phone) return alert('El cliente no tiene teléfono guardado.');
+    
+    const message = `¡Hola ${item.client}! 👋\nEsperamos que hayas quedado encantado con la limpieza de tu vehículo. 🚗✨\n\nPara nosotros tu opinión es fundamental. Si te ha gustado el resultado, ¿nos regalarías 1 minuto para dejarnos 5 estrellitas en Google? Nos ayuda muchísimo a seguir creciendo. 🙏\n\n⭐ Puedes hacerlo aquí: https://g.page/r/Cby71i4U3YJmEBM/review\n\n¡Mil gracias por confiar en InnovaNor / NewAgain!`;
+    
+    let phoneNum = item.phone.replace(/\s+/g, '');
+    if (phoneNum.length === 9 && (phoneNum.startsWith('6') || phoneNum.startsWith('7') || phoneNum.startsWith('8') || phoneNum.startsWith('9'))) {
+      phoneNum = '34' + phoneNum;
+    } else if (phoneNum.startsWith('+')) {
+      phoneNum = phoneNum.substring(1);
+    }
+    
+    const url = `https://wa.me/${phoneNum}?text=${encodeURIComponent(message)}`;
+    
+    try {
+      await updateDoc(doc(db, 'appointments', item.id), {
+        reviewRequested: true
+      });
+      Linking.openURL(url);
+    } catch(e) {
+      alert('Error al actualizar el estado de la reseña.');
     }
   };
 
@@ -902,14 +927,28 @@ export default function CalendarScreen({ route, navigation }: any) {
                     <Text style={styles.completeApptBtnText}>✅ Finalizar Servicio</Text>
                   </TouchableOpacity>
                 ) : (
-                  <View style={styles.completedBadge}>
-                    <Text style={styles.completedBadgeText}>Servicio Completado ✓</Text>
+                  <View style={{ flex: 1, gap: 10 }}>
+                    <View style={styles.completedBadge}>
+                      <Text style={styles.completedBadgeText}>Servicio Completado ✓</Text>
+                    </View>
+                    {selectedAppointment.phone ? (
+                      <TouchableOpacity 
+                        style={[styles.reviewBtn, selectedAppointment.reviewRequested && styles.reviewBtnSent]} 
+                        onPress={() => requestGoogleReview(selectedAppointment)}
+                      >
+                        <Text style={[styles.reviewBtnText, selectedAppointment.reviewRequested && styles.reviewBtnTextSent]}>
+                          {selectedAppointment.reviewRequested ? '✅ Reseña Solicitada' : '⭐ Solicitar Reseña en Google'}
+                        </Text>
+                      </TouchableOpacity>
+                    ) : null}
                   </View>
                 )}
                 
-                <TouchableOpacity style={styles.deleteApptIconBtn} onPress={() => deleteAppointment(selectedAppointment.id)}>
-                  <Text style={styles.deleteApptIconBtnText}>🗑️</Text>
-                </TouchableOpacity>
+                {isAdmin && (
+                  <TouchableOpacity style={styles.deleteApptIconBtn} onPress={() => deleteAppointment(selectedAppointment.id)}>
+                    <Text style={styles.deleteApptIconBtnText}>🗑️</Text>
+                  </TouchableOpacity>
+                )}
               </View>
             </View>
           )}
@@ -1230,7 +1269,11 @@ const styles = StyleSheet.create({
   completeApptBtn: { flex: 1, backgroundColor: '#2ecc71', paddingVertical: 14, borderRadius: 8, alignItems: 'center', elevation: 1 },
   completeApptBtnText: { color: '#fff', fontWeight: 'bold', fontSize: 15 },
   completedBadge: { flex: 1, backgroundColor: '#eafaf1', paddingVertical: 14, borderRadius: 8, alignItems: 'center', borderWidth: 1, borderColor: '#2ecc71' },
-  completedBadgeText: { color: '#27ae60', fontWeight: 'bold', fontSize: 15 },
+  completedBadgeText: { color: '#256320', fontWeight: 'bold', fontSize: 16 },
+  reviewBtn: { backgroundColor: '#fff', borderWidth: 2, borderColor: '#fbbc05', padding: 12, borderRadius: 8, alignItems: 'center' },
+  reviewBtnSent: { backgroundColor: '#fff', borderColor: '#d3d3d3', borderWidth: 1 },
+  reviewBtnText: { color: '#fbbc05', fontWeight: 'bold', fontSize: 15 },
+  reviewBtnTextSent: { color: '#888', fontWeight: 'bold', fontSize: 14 },
   deleteApptIconBtn: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#d9534f', width: 50, borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
   deleteApptIconBtnText: { fontSize: 20 },
   
