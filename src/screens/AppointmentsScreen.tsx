@@ -29,6 +29,7 @@ export default function AppointmentsScreen({ navigation }: any) {
   const [addressSuggestions, setAddressSuggestions] = useState<any[]>([]);
   const [isValidating, setIsValidating] = useState(false);
   const [isValidated, setIsValidated] = useState(false);
+  const [targetCoords, setTargetCoords] = useState<{lat: number, lon: number} | null>(null);
 
   const [price, setPrice] = useState('');
   const [team, setTeam] = useState('Equipo 1');
@@ -106,6 +107,7 @@ export default function AppointmentsScreen({ navigation }: any) {
       if (existingClientData.address) {
         setAddressInput(existingClientData.address);
         setValidatedAddress(existingClientData.address);
+        if (existingClientData.coords) setTargetCoords(existingClientData.coords);
         setIsValidated(true);
       }
       if (existingClientData.detailedInfo) setDetailedInfo(existingClientData.detailedInfo);
@@ -138,11 +140,13 @@ export default function AppointmentsScreen({ navigation }: any) {
           const city = p.city || p.town || p.district || p.county || 'Madrid';
           const postcode = p.postcode ? ` (${p.postcode})` : '';
           const state = p.state || p.country || '';
+          const coords = f.geometry?.coordinates ? { lon: f.geometry.coordinates[0], lat: f.geometry.coordinates[1] } : null;
 
           return {
             title: `${street}${num}`.trim() || p.name,
             subtitle: `🏛️ ${city}${postcode} · ${state}`,
-            fullFormatted: `${street}${num}, ${city}${postcode}`.trim()
+            fullFormatted: `${street}${num}, ${city}${postcode}`.trim(),
+            coords
           };
         });
         setAddressSuggestions(results);
@@ -159,6 +163,7 @@ export default function AppointmentsScreen({ navigation }: any) {
     const chosen = item.fullFormatted || item.title;
     setAddressInput(chosen);
     setValidatedAddress(chosen);
+    if (item.coords) setTargetCoords(item.coords);
     setIsValidated(true);
     setAddressSuggestions([]);
   };
@@ -199,6 +204,18 @@ export default function AppointmentsScreen({ navigation }: any) {
     setPrice(suggestedPrice > 0 ? suggestedPrice.toString() : '');
   };
 
+  const getDistanceFromLatLonInKm = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+    const R = 6371; 
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = 
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+      Math.sin(dLon / 2) * Math.sin(dLon / 2); 
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)); 
+    return R * c; 
+  };
+
   const checkSlotStatus = (testTime: string) => {
     if (selectedServices.length === 0) return { conflict: false };
     const currentTeam = team || (teams[0]?.name ?? 'Equipo 1');
@@ -208,19 +225,25 @@ export default function AppointmentsScreen({ navigation }: any) {
     const newStart = getMinutes(testTime);
     const totalDuration = selectedServices.reduce((sum, s) => sum + parseInt(s.duration || '0', 10), 0);
     const newEnd = newStart + totalDuration;
-    const travelMargin = 30; 
     
     for (const app of teamApps) {
       const existingStart = getMinutes(app.time);
       const existingEnd = existingStart + parseInt(app.duration);
+      
+      let travelMargin = 30; 
+      if (targetCoords && app.coords) {
+        const distKm = getDistanceFromLatLonInKm(targetCoords.lat, targetCoords.lon, app.coords.lat, app.coords.lon);
+        travelMargin = Math.max(10, Math.ceil(distKm * 3) + 5);
+      }
+
       if (newStart < existingEnd && newEnd > existingStart) {
         return { conflict: true, reason: `⚠️ Solapamiento: Ya hay una cita de ${app.time} a ${Math.floor(existingEnd/60)}:${(existingEnd%60).toString().padStart(2,'0')}.` };
       }
       if (newStart >= existingEnd && newStart - existingEnd < travelMargin) {
-        return { conflict: true, reason: `🚗 Falta tiempo al llegar: La cita de antes acaba a las ${Math.floor(existingEnd/60)}:${(existingEnd%60).toString().padStart(2,'0')}. Solo tienes ${newStart - existingEnd} min para conducir.` };
+        return { conflict: true, reason: `🚗 Falta tiempo al llegar: Necesitas ~${travelMargin}m de viaje desde la cita anterior y solo tienes ${newStart - existingEnd}m.` };
       }
       if (newEnd <= existingStart && existingStart - newEnd < travelMargin) {
-        return { conflict: true, reason: `🚗 Falta tiempo al salir: Terminarías a las ${Math.floor(newEnd/60)}:${(newEnd%60).toString().padStart(2,'0')}. Solo tienes ${existingStart - newEnd} min para conducir a la cita de las ${app.time}.` };
+        return { conflict: true, reason: `🚗 Falta tiempo al salir: Necesitas ~${travelMargin}m de viaje para la cita de las ${app.time} y solo tienes ${existingStart - newEnd}m libres.` };
       }
     }
     return { conflict: false };
@@ -317,8 +340,7 @@ export default function AppointmentsScreen({ navigation }: any) {
       const cleanPhone = phone.trim();
       const cleanClient = client.trim();
 
-      // 1. Guardar la cita
-      await addDoc(collection(db, 'appointments'), {
+      const appointmentData: any = {
         client: cleanClient,
         phone: cleanPhone,
         date,
@@ -330,7 +352,14 @@ export default function AppointmentsScreen({ navigation }: any) {
         serviceName: selectedServices.map(s => s.name).join(' + '),
         duration: selectedServices.reduce((sum, s) => sum + parseInt(s.duration || '0', 10), 0).toString(),
         createdAt: new Date()
-      });
+      };
+
+      if (targetCoords) {
+        appointmentData.coords = targetCoords;
+      }
+
+      // 1. Guardar la cita
+      await addDoc(collection(db, 'appointments'), appointmentData);
 
       // 2. Gestionar la ficha de Cliente (Crear nuevo o Actualizar existente)
       if (cleanPhone) {
@@ -340,23 +369,27 @@ export default function AppointmentsScreen({ navigation }: any) {
         if (!snap.empty) {
           // Cliente existente: actualizar datos si cambiaron
           const existingDoc = snap.docs[0];
-          await updateDoc(doc(db, 'clients', existingDoc.id), {
+          const updateData: any = {
             name: cleanClient,
             address: finalAddress,
             detailedInfo: detailedInfo.trim(),
             lastServiceDate: date,
             updatedAt: new Date()
-          });
+          };
+          if (targetCoords) updateData.coords = targetCoords;
+          await updateDoc(doc(db, 'clients', existingDoc.id), updateData);
         } else {
           // Cliente nuevo: registrar en cartera de clientes
-          await addDoc(collection(db, 'clients'), {
+          const newData: any = {
             name: cleanClient,
             phone: cleanPhone,
             address: finalAddress,
             detailedInfo: detailedInfo.trim(),
             createdAt: new Date(),
             lastServiceDate: date
-          });
+          };
+          if (targetCoords) newData.coords = targetCoords;
+          await addDoc(collection(db, 'clients'), newData);
         }
       }
 
