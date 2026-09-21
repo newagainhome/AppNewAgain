@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -10,7 +10,8 @@ import {
   Linking,
   Image,
   ActivityIndicator,
-  Platform
+  Platform,
+  Animated
 } from 'react-native';
 import { Calendar } from 'react-native-calendars';
 import { collection, onSnapshot, query, where, doc, deleteDoc, addDoc, updateDoc } from 'firebase/firestore';
@@ -55,6 +56,7 @@ export default function CalendarScreen({ route, navigation }: any) {
   const isStrictAdmin = role === 'admin'; // Para funciones exclusivas de admin (borrar, facturar, etc.)
 
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const scrollX = useRef(new Animated.Value(0)).current;
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [teams, setTeams] = useState<any[]>([]);
   
@@ -981,13 +983,22 @@ export default function CalendarScreen({ route, navigation }: any) {
         };
 
         return (
-          <ScrollView horizontal showsHorizontalScrollIndicator={true} style={{ flex: 1, backgroundColor: '#fff' }}>
+          <Animated.ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={true} 
+            style={{ flex: 1, backgroundColor: '#fff' }}
+            onScroll={Animated.event(
+              [{ nativeEvent: { contentOffset: { x: scrollX } } }],
+              { useNativeDriver: true }
+            )}
+            scrollEventThrottle={16}
+          >
             <ScrollView showsVerticalScrollIndicator={false} stickyHeaderIndices={[0]}>
               
-              {/* Row 1: Cabeceras de equipo (Sticky) */}
+              {/* Row 1: Cabeceras de equipo (Sticky V) */}
               <View style={{ flexDirection: 'row', backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#dadce0', zIndex: 10 }}>
-                {/* Esquina vacía */}
-                <View style={{ width: LABEL_WIDTH, borderRightWidth: 1, borderRightColor: '#dadce0' }} />
+                {/* Esquina vacía (Sticky V + H) */}
+                <Animated.View style={{ width: LABEL_WIDTH, borderRightWidth: 1, borderRightColor: '#dadce0', backgroundColor: '#fff', zIndex: 20, transform: [{ translateX: scrollX }] }} />
                 {visibleTeams.map(t => {
                   const teamApps = appointments.filter(a => (a.team || teams[0]?.name) === t.name);
                   return (
@@ -1003,8 +1014,8 @@ export default function CalendarScreen({ route, navigation }: any) {
               {/* Row 2: Cuerpo del grid */}
               <View style={{ flexDirection: 'row', position: 'relative' }}>
                 
-                {/* Etiquetas de horas */}
-                <View style={{ width: LABEL_WIDTH, borderRightWidth: 1, borderRightColor: '#dadce0', backgroundColor: '#fff' }}>
+                {/* Etiquetas de horas (Sticky H) */}
+                <Animated.View style={{ width: LABEL_WIDTH, borderRightWidth: 1, borderRightColor: '#dadce0', backgroundColor: '#fff', zIndex: 10, transform: [{ translateX: scrollX }] }}>
                   {Array.from({ length: GRID_HEIGHT / (60 * PX_PER_MIN) + 1 }, (_, i) => {
                     const h = START_HOUR + i;
                     if (h > END_HOUR) return null;
@@ -1014,7 +1025,7 @@ export default function CalendarScreen({ route, navigation }: any) {
                       </View>
                     );
                   })}
-                </View>
+                </Animated.View>
 
                 {/* Líneas horizontales de fondo (cruzan todos los equipos) */}
                 <View style={{ position: 'absolute', top: 0, left: LABEL_WIDTH, right: 0, bottom: 0, zIndex: -1 }}>
@@ -1090,7 +1101,7 @@ export default function CalendarScreen({ route, navigation }: any) {
                 })}
               </View>
             </ScrollView>
-          </ScrollView>
+          </Animated.ScrollView>
         );
       })()}
 
