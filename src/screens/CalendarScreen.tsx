@@ -8,10 +8,10 @@ import {
   TextInput,
   Modal,
   Linking,
-  Image,
   ActivityIndicator,
   Platform,
-  Animated
+  Animated,
+  useWindowDimensions
 } from 'react-native';
 import { Calendar } from 'react-native-calendars';
 import { collection, onSnapshot, query, where, doc, deleteDoc, addDoc, updateDoc } from 'firebase/firestore';
@@ -57,6 +57,8 @@ export default function CalendarScreen({ route, navigation }: any) {
 
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const scrollX = useRef(new Animated.Value(0)).current;
+  const { width: screenWidth } = useWindowDimensions();
+  const [fitToScreen, setFitToScreen] = useState(false);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [teams, setTeams] = useState<any[]>([]);
   
@@ -807,6 +809,15 @@ export default function CalendarScreen({ route, navigation }: any) {
             </TouchableOpacity>
           </View>
 
+          {calendarView === 'day' && (
+            <TouchableOpacity 
+              style={[styles.viewToggleBtn, { marginLeft: 8, paddingHorizontal: 10 }, fitToScreen && styles.viewToggleBtnActive]} 
+              onPress={() => setFitToScreen(!fitToScreen)}
+            >
+              <Text style={[styles.viewToggleText, fitToScreen && styles.viewToggleTextActive]}>↔️ Ajustar</Text>
+            </TouchableOpacity>
+          )}
+
           {isAdmin && (
             <TouchableOpacity style={styles.optimizerBtn} onPress={analyzeRoutes}>
               <Text style={styles.optimizerBtnText}>🪄 Optimizar</Text>
@@ -967,9 +978,11 @@ export default function CalendarScreen({ route, navigation }: any) {
         const PX_PER_MIN = 2;      // 2px por minuto → cada hora = 120px
         const GRID_HEIGHT = TOTAL_MINS * PX_PER_MIN;
         const LABEL_WIDTH = 48;
-        const COL_WIDTH = 180;
-        const HOUR_LINES = Array.from({ length: Math.ceil(END_HOUR - START_HOUR) + 1 }, (_, i) => START_HOUR + i);
         const visibleTeams = teams.filter(t => isAdmin || t.name === userTeamName);
+        const COL_WIDTH = fitToScreen && visibleTeams.length > 0
+          ? Math.max(80, (screenWidth - LABEL_WIDTH) / visibleTeams.length)
+          : 180;
+        const HOUR_LINES = Array.from({ length: Math.ceil(END_HOUR - START_HOUR) + 1 }, (_, i) => START_HOUR + i);
 
         const timeToTop = (time: string) => {
           const [h, m] = time.split(':').map(Number);
