@@ -181,10 +181,21 @@ export default function AppointmentsScreen({ navigation }: any) {
   };
 
   const handleSelectService = (srv: any) => {
-    setSelectedService(srv);
-    if (srv.price && !price) {
-      setPrice(srv.price);
+    const exists = selectedServices.find(s => s.id === srv.id);
+    let newServices;
+    if (exists) {
+      newServices = selectedServices.filter(s => s.id !== srv.id);
+    } else {
+      newServices = [...selectedServices, srv];
     }
+    
+    setSelectedServices(newServices);
+    
+    const suggestedPrice = newServices.reduce((sum, s) => {
+      const p = parseFloat(s.price || '0');
+      return sum + (isNaN(p) ? 0 : p);
+    }, 0);
+    setPrice(suggestedPrice > 0 ? suggestedPrice.toString() : '');
   };
 
   const checkSlotStatus = (testTime: string) => {
