@@ -37,6 +37,7 @@ export default function AppointmentsScreen({ navigation }: any) {
   
   const [services, setServices] = useState<any[]>([]);
   const [selectedServices, setSelectedServices] = useState<any[]>([]);
+  const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
   
   const [existingAppointments, setExistingAppointments] = useState<any[]>([]);
   const [smartSuggestion, setSmartSuggestion] = useState<any>(null);
@@ -506,27 +507,45 @@ export default function AppointmentsScreen({ navigation }: any) {
           acc[cat].push(srv);
           return acc;
         }, {} as Record<string, any[]>);
-        return Object.keys(grouped).sort().map(category => (
-          <View key={category} style={{ marginBottom: 10 }}>
-            <Text style={{ fontSize: 13, fontWeight: 'bold', color: '#888', marginBottom: 6, textTransform: 'uppercase' }}>{category}</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexDirection: 'row', paddingBottom: 4 }}>
-              {grouped[category].map(srv => {
-                const isSelected = selectedServices.some(s => s.id === srv.id);
-                return (
-                  <TouchableOpacity 
-                    key={srv.id} 
-                    style={[styles.chipBtn, isSelected && styles.chipSelected]}
-                    onPress={() => handleSelectService(srv)}
-                  >
-                    <Text style={isSelected ? styles.textSelected : styles.textUnselected}>
-                      {srv.name} (⏱ {srv.duration}m{srv.price ? ` · 💶 ${srv.price}€` : ''})
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-          </View>
-        ));
+        return Object.keys(grouped).sort().map(category => {
+          const isExpanded = expandedCategories[category];
+          // Determine if any service in this category is selected
+          const hasSelected = grouped[category].some(srv => selectedServices.some(s => s.id === srv.id));
+          return (
+            <View key={category} style={{ marginBottom: 10, backgroundColor: '#fff', borderRadius: 8, borderWidth: 1, borderColor: '#eee', overflow: 'hidden' }}>
+              <TouchableOpacity 
+                style={{ flexDirection: 'row', justifyContent: 'space-between', padding: 12, backgroundColor: hasSelected ? '#f0fdf4' : '#fafafa' }}
+                onPress={() => setExpandedCategories(prev => ({ ...prev, [category]: !prev[category] }))}
+              >
+                <Text style={{ fontSize: 14, fontWeight: 'bold', color: hasSelected ? '#14532d' : '#002a54', textTransform: 'uppercase' }}>
+                  {category} {hasSelected && '✅'}
+                </Text>
+                <Text style={{ fontSize: 14, color: '#888' }}>{isExpanded ? '▲' : '▼'}</Text>
+              </TouchableOpacity>
+
+              {isExpanded && (
+                <View style={{ padding: 10 }}>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexDirection: 'row' }}>
+                    {grouped[category].map(srv => {
+                      const isSelected = selectedServices.some(s => s.id === srv.id);
+                      return (
+                        <TouchableOpacity 
+                          key={srv.id} 
+                          style={[styles.chipBtn, isSelected && styles.chipSelected]}
+                          onPress={() => handleSelectService(srv)}
+                        >
+                          <Text style={isSelected ? styles.textSelected : styles.textUnselected}>
+                            {srv.name} (⏱ {srv.duration}m{srv.price ? ` · 💶 ${srv.price}€` : ''})
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </ScrollView>
+                </View>
+              )}
+            </View>
+          );
+        });
       })()}
 
       <TouchableOpacity style={styles.smartButton} onPress={findOptimalSlot}>
