@@ -36,7 +36,7 @@ export default function AppointmentsScreen({ navigation }: any) {
   const [showCalendar, setShowCalendar] = useState(false);
   
   const [services, setServices] = useState<any[]>([]);
-  const [selectedService, setSelectedService] = useState<any>(null);
+  const [selectedServices, setSelectedServices] = useState<any[]>([]);
   
   const [existingAppointments, setExistingAppointments] = useState<any[]>([]);
   const [smartSuggestion, setSmartSuggestion] = useState<any>(null);
@@ -188,13 +188,14 @@ export default function AppointmentsScreen({ navigation }: any) {
   };
 
   const checkSlotStatus = (testTime: string) => {
-    if (!selectedService) return { conflict: false };
+    if (selectedServices.length === 0) return { conflict: false };
     const currentTeam = team || (teams[0]?.name ?? 'Equipo 1');
     const teamApps = existingAppointments.filter(a => (a.team || teams[0]?.name || 'Equipo 1') === currentTeam);
 
     const getMinutes = (t: string) => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
     const newStart = getMinutes(testTime);
-    const newEnd = newStart + parseInt(selectedService.duration);
+    const totalDuration = selectedServices.reduce((sum, s) => sum + parseInt(s.duration || '0', 10), 0);
+    const newEnd = newStart + totalDuration;
     const travelMargin = 30; 
     
     for (const app of teamApps) {
@@ -215,8 +216,8 @@ export default function AppointmentsScreen({ navigation }: any) {
 
   const findOptimalSlot = async () => {
     const targetAddr = validatedAddress || addressInput;
-    if (!targetAddr || targetAddr.length < 4 || !selectedService) {
-      Alert.alert("Aviso", "Primero escribe la dirección y selecciona un servicio.");
+    if (!targetAddr || targetAddr.length < 4 || selectedServices.length === 0) {
+      Alert.alert("Aviso", "Primero escribe la dirección y selecciona al menos un servicio.");
       return;
     }
 
@@ -282,7 +283,7 @@ export default function AppointmentsScreen({ navigation }: any) {
   };
 
   const saveAppointment = async () => {
-    if (!client.trim() || !date || !time || !selectedService) {
+    if (!client.trim() || !date || !time || selectedServices.length === 0) {
       alert("Por favor, rellena los campos obligatorios (cliente, servicio, fecha y hora).");
       return;
     }
@@ -314,8 +315,8 @@ export default function AppointmentsScreen({ navigation }: any) {
         detailedInfo: detailedInfo.trim(),
         price: price.trim() || '',
         team: finalTeam,
-        serviceName: selectedService.name,
-        duration: selectedService.duration,
+        serviceName: selectedServices.map(s => s.name).join(' + '),
+        duration: selectedServices.reduce((sum, s) => sum + parseInt(s.duration || '0', 10), 0).toString(),
         createdAt: new Date()
       });
 
@@ -357,7 +358,7 @@ export default function AppointmentsScreen({ navigation }: any) {
       setDetailedInfo('');
       setIsValidated(false);
       setPrice('');
-      setSelectedService(null);
+      setSelectedServices([]);
       setSmartSuggestion(null);
       navigation.navigate('Calendar');
     } catch (error) {
@@ -486,19 +487,22 @@ export default function AppointmentsScreen({ navigation }: any) {
         />
       </View>
 
-      <Text style={styles.subtitle}>1. Servicio:</Text>
+      <Text style={styles.subtitle}>1. Servicio(s):</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.scrollRow}>
-        {services.map(srv => (
-          <TouchableOpacity 
-            key={srv.id} 
-            style={[styles.chipBtn, selectedService?.id === srv.id && styles.chipSelected]}
-            onPress={() => handleSelectService(srv)}
-          >
-            <Text style={selectedService?.id === srv.id ? styles.textSelected : styles.textUnselected}>
-              {srv.name} (⏱ {srv.duration}m{srv.price ? ` · 💶 ${srv.price}€` : ''})
-            </Text>
-          </TouchableOpacity>
-        ))}
+        {services.map(srv => {
+          const isSelected = selectedServices.some(s => s.id === srv.id);
+          return (
+            <TouchableOpacity 
+              key={srv.id} 
+              style={[styles.chipBtn, isSelected && styles.chipSelected]}
+              onPress={() => handleSelectService(srv)}
+            >
+              <Text style={isSelected ? styles.textSelected : styles.textUnselected}>
+                {srv.name} (⏱ {srv.duration}m{srv.price ? ` · 💶 ${srv.price}€` : ''})
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
       </ScrollView>
 
       <TouchableOpacity style={styles.smartButton} onPress={findOptimalSlot}>
@@ -549,10 +553,10 @@ export default function AppointmentsScreen({ navigation }: any) {
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.scrollRow}>
         {timeSlots.map(t => {
           const status = checkSlotStatus(t);
-          const isConflict = selectedService ? status.conflict : false;
+          const isConflict = selectedServices.length > 0 ? status.conflict : false;
           let chipStyle: any = styles.chipBtn; let textStyle: any = styles.textUnselected;
           if (time === t) { chipStyle = styles.chipSelected; textStyle = styles.textSelected; } 
-          else if (selectedService) {
+          else if (selectedServices.length > 0) {
              if (isConflict) { chipStyle = styles.chipConflict; textStyle = styles.textConflict; } 
              else { chipStyle = styles.chipAvailable; textStyle = styles.textAvailable; }
           }
