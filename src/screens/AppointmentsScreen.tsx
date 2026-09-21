@@ -499,22 +499,35 @@ export default function AppointmentsScreen({ navigation }: any) {
       </View>
 
       <Text style={styles.subtitle}>1. Servicio(s):</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.scrollRow}>
-        {services.map(srv => {
-          const isSelected = selectedServices.some(s => s.id === srv.id);
-          return (
-            <TouchableOpacity 
-              key={srv.id} 
-              style={[styles.chipBtn, isSelected && styles.chipSelected]}
-              onPress={() => handleSelectService(srv)}
-            >
-              <Text style={isSelected ? styles.textSelected : styles.textUnselected}>
-                {srv.name} (⏱ {srv.duration}m{srv.price ? ` · 💶 ${srv.price}€` : ''})
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-      </ScrollView>
+      {(() => {
+        const grouped = services.reduce((acc, srv) => {
+          const cat = srv.category || 'Otros';
+          if (!acc[cat]) acc[cat] = [];
+          acc[cat].push(srv);
+          return acc;
+        }, {} as Record<string, any[]>);
+        return Object.keys(grouped).sort().map(category => (
+          <View key={category} style={{ marginBottom: 10 }}>
+            <Text style={{ fontSize: 13, fontWeight: 'bold', color: '#888', marginBottom: 6, textTransform: 'uppercase' }}>{category}</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexDirection: 'row', paddingBottom: 4 }}>
+              {grouped[category].map(srv => {
+                const isSelected = selectedServices.some(s => s.id === srv.id);
+                return (
+                  <TouchableOpacity 
+                    key={srv.id} 
+                    style={[styles.chipBtn, isSelected && styles.chipSelected]}
+                    onPress={() => handleSelectService(srv)}
+                  >
+                    <Text style={isSelected ? styles.textSelected : styles.textUnselected}>
+                      {srv.name} (⏱ {srv.duration}m{srv.price ? ` · 💶 ${srv.price}€` : ''})
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        ));
+      })()}
 
       <TouchableOpacity style={styles.smartButton} onPress={findOptimalSlot}>
         <Text style={styles.smartButtonText}>✨ Sugerir Equipo y Fecha Óptimos</Text>

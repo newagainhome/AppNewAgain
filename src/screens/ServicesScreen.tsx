@@ -6,6 +6,7 @@ import { db } from '../config/firebase';
 interface Service {
   id: string;
   name: string;
+  category?: string;
   duration: string;
   price?: string;
 }
@@ -13,6 +14,7 @@ interface Service {
 export default function ServicesScreen() {
   const [services, setServices] = useState<Service[]>([]);
   const [name, setName] = useState('');
+  const [category, setCategory] = useState('');
   const [duration, setDuration] = useState('');
   const [price, setPrice] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -24,6 +26,14 @@ export default function ServicesScreen() {
       const servicesList: Service[] = [];
       snapshot.forEach((docSnap) => {
         servicesList.push({ id: docSnap.id, ...docSnap.data() } as Service);
+      });
+      // Sort by category then name
+      servicesList.sort((a, b) => {
+        const catA = a.category || 'Otros';
+        const catB = b.category || 'Otros';
+        if (catA < catB) return -1;
+        if (catA > catB) return 1;
+        return a.name.localeCompare(b.name);
       });
       setServices(servicesList);
       setLoading(false);
@@ -43,6 +53,7 @@ export default function ServicesScreen() {
     try {
       const serviceData: any = {
         name: name.trim(),
+        category: category.trim() || 'Otros',
         duration: duration.trim(),
         price: price.trim() || ''
       };
@@ -60,6 +71,7 @@ export default function ServicesScreen() {
         });
       }
       setName('');
+      setCategory('');
       setDuration('');
       setPrice('');
     } catch (error) {
@@ -70,6 +82,7 @@ export default function ServicesScreen() {
   const startEdit = (item: Service) => {
     setEditingId(item.id);
     setName(item.name);
+    setCategory(item.category || '');
     setDuration(item.duration);
     setPrice(item.price || '');
   };
@@ -77,6 +90,7 @@ export default function ServicesScreen() {
   const cancelEdit = () => {
     setEditingId(null);
     setName('');
+    setCategory('');
     setDuration('');
     setPrice('');
   };
@@ -105,6 +119,12 @@ export default function ServicesScreen() {
         placeholder="Nombre (ej. Limpieza Sofá 3 plazas)"
         value={name}
         onChangeText={setName}
+      />
+      <TextInput
+        style={styles.input}
+        placeholder="Categoría (ej. Sofás, Alfombras, Colchones)"
+        value={category}
+        onChangeText={setCategory}
       />
       <TextInput
         style={styles.input}
@@ -147,6 +167,7 @@ export default function ServicesScreen() {
           renderItem={({ item }) => (
             <View style={[styles.serviceCard, editingId === item.id && styles.serviceCardEditing]}>
               <View style={styles.serviceInfo}>
+                <Text style={styles.serviceCategoryBadge}>{item.category || 'Otros'}</Text>
                 <Text style={styles.serviceName}>{item.name}</Text>
                 <View style={styles.badgeRow}>
                   <Text style={styles.serviceDuration}>⏱ {item.duration} min</Text>
@@ -189,6 +210,7 @@ const styles = StyleSheet.create({
   badgeRow: { flexDirection: 'row', gap: 10, alignItems: 'center' },
   serviceDuration: { color: '#4a9b40', fontWeight: 'bold', fontSize: 14 },
   servicePrice: { color: '#002a54', fontWeight: 'bold', fontSize: 14, backgroundColor: '#eef4fa', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4 },
+  serviceCategoryBadge: { color: '#f39c12', fontWeight: 'bold', fontSize: 11, textTransform: 'uppercase', marginBottom: 2 },
   cardActions: { flexDirection: 'row', gap: 8 },
   iconBtn: { padding: 8, borderRadius: 6, backgroundColor: '#f0f4f8' },
   actionIcon: { fontSize: 16 },
