@@ -975,64 +975,83 @@ export default function CalendarScreen({ route, navigation }: any) {
         };
 
         const STATUS_COLORS: Record<string, { bg: string; border: string; text: string }> = {
-          pending:     { bg: '#fffbeb', border: '#f39c12', text: '#92400e' },
-          in_progress: { bg: '#eff6ff', border: '#3498db', text: '#1e3a8a' },
-          completed:   { bg: '#f0fdf4', border: '#4a9b40', text: '#14532d' },
+          pending:     { bg: '#fef3c7', border: '#f59e0b', text: '#b45309' }, // Ámbar cálido
+          in_progress: { bg: '#e0f2fe', border: '#0ea5e9', text: '#0369a1' }, // Azul moderno
+          completed:   { bg: '#dcfce7', border: '#22c55e', text: '#15803d' }, // Verde fresco
         };
 
         return (
-          <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
-            {/* Cabeceras de equipo */}
-            <View style={{ flexDirection: 'row', marginLeft: LABEL_WIDTH, borderBottomWidth: 2, borderBottomColor: '#e0e8f0' }}>
-              {visibleTeams.map(t => {
-                const teamApps = appointments.filter(a => (a.team || teams[0]?.name) === t.name);
-                return (
-                  <View key={t.id} style={{ width: COL_WIDTH, paddingHorizontal: 8, paddingVertical: 10, borderRightWidth: 1, borderRightColor: '#e0e8f0', backgroundColor: '#f8fafc' }}>
-                    <Text style={{ fontWeight: 'bold', color: '#002a54', fontSize: 13 }}>🚐 {t.name}</Text>
-                    {t.members ? <Text style={{ fontSize: 11, color: '#888', marginTop: 2 }}>👥 {t.members}</Text> : null}
-                    <Text style={{ fontSize: 11, color: '#4a9b40', marginTop: 2, fontWeight: 'bold' }}>{teamApps.length} cita{teamApps.length !== 1 ? 's' : ''}</Text>
-                  </View>
-                );
-              })}
-            </View>
+          <ScrollView horizontal showsHorizontalScrollIndicator={true} style={{ flex: 1, backgroundColor: '#fff' }}>
+            <ScrollView showsVerticalScrollIndicator={false} stickyHeaderIndices={[0]}>
+              
+              {/* Row 1: Cabeceras de equipo (Sticky) */}
+              <View style={{ flexDirection: 'row', backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#dadce0', zIndex: 10 }}>
+                {/* Esquina vacía */}
+                <View style={{ width: LABEL_WIDTH, borderRightWidth: 1, borderRightColor: '#dadce0' }} />
+                {visibleTeams.map(t => {
+                  const teamApps = appointments.filter(a => (a.team || teams[0]?.name) === t.name);
+                  return (
+                    <View key={t.id} style={{ width: COL_WIDTH, paddingHorizontal: 8, paddingVertical: 12, borderRightWidth: 1, borderRightColor: '#dadce0', alignItems: 'center' }}>
+                      <Text style={{ fontWeight: '600', color: '#3c4043', fontSize: 13 }}>🚐 {t.name}</Text>
+                      {t.members ? <Text style={{ fontSize: 11, color: '#70757a', marginTop: 2 }}>{t.members}</Text> : null}
+                      <Text style={{ fontSize: 10, color: '#1a73e8', marginTop: 4, fontWeight: 'bold' }}>{teamApps.length} CITA{teamApps.length !== 1 ? 'S' : ''}</Text>
+                    </View>
+                  );
+                })}
+              </View>
 
-            {/* Cuerpo del grid */}
-            <ScrollView horizontal showsHorizontalScrollIndicator={true}>
-              <View style={{ flexDirection: 'row' }}>
-
+              {/* Row 2: Cuerpo del grid */}
+              <View style={{ flexDirection: 'row', position: 'relative' }}>
+                
                 {/* Etiquetas de horas */}
-                <View style={{ width: LABEL_WIDTH }}>
+                <View style={{ width: LABEL_WIDTH, borderRightWidth: 1, borderRightColor: '#dadce0', backgroundColor: '#fff' }}>
                   {Array.from({ length: GRID_HEIGHT / (60 * PX_PER_MIN) + 1 }, (_, i) => {
                     const h = START_HOUR + i;
                     if (h > END_HOUR) return null;
                     return (
-                      <View key={h} style={{ height: 60 * PX_PER_MIN, justifyContent: 'flex-start', paddingTop: 4, paddingRight: 6 }}>
-                        <Text style={{ fontSize: 11, color: '#aaa', textAlign: 'right' }}>{String(Math.floor(h)).padStart(2,'0')}:00</Text>
+                      <View key={h} style={{ height: 60 * PX_PER_MIN, justifyContent: 'flex-start', paddingTop: -8 }}>
+                        <Text style={{ fontSize: 10, color: '#70757a', textAlign: 'center', marginTop: -6 }}>{String(Math.floor(h)).padStart(2,'0')}:00</Text>
                       </View>
                     );
                   })}
                 </View>
 
+                {/* Líneas horizontales de fondo (cruzan todos los equipos) */}
+                <View style={{ position: 'absolute', top: 0, left: LABEL_WIDTH, right: 0, bottom: 0, zIndex: -1 }}>
+                  {HOUR_LINES.map(h => (
+                    <View key={h} style={{ position: 'absolute', top: (h - START_HOUR) * 60 * PX_PER_MIN, left: 0, right: 0, height: 1, backgroundColor: '#dadce0' }} />
+                  ))}
+                  {HOUR_LINES.map(h => (
+                    <View key={`h-${h}`} style={{ position: 'absolute', top: (h - START_HOUR) * 60 * PX_PER_MIN + 30 * PX_PER_MIN, left: 0, right: 0, height: 1, backgroundColor: '#f1f3f4' }} />
+                  ))}
+                </View>
+
+                {/* Línea de tiempo actual (Roja) */}
+                {(() => {
+                  const now = new Date();
+                  const isToday = selectedDate === now.toISOString().split('T')[0];
+                  const currentMins = now.getHours() * 60 + now.getMinutes();
+                  if (isToday && currentMins >= START_HOUR * 60 && currentMins <= END_HOUR * 60) {
+                    const top = (currentMins - START_HOUR * 60) * PX_PER_MIN;
+                    return (
+                      <View style={{ position: 'absolute', top, left: LABEL_WIDTH - 6, right: 0, height: 2, backgroundColor: '#ea4335', zIndex: 5, flexDirection: 'row', alignItems: 'center' }}>
+                        <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: '#ea4335', marginLeft: 1 }} />
+                      </View>
+                    );
+                  }
+                  return null;
+                })()}
+
                 {/* Columnas por equipo */}
                 {visibleTeams.map(t => {
                   const teamApps = appointments.filter(a => (a.team || teams[0]?.name) === t.name);
                   return (
-                    <View key={t.id} style={{ width: COL_WIDTH, height: GRID_HEIGHT, position: 'relative', borderRightWidth: 1, borderRightColor: '#e8eef4' }}>
-                      {/* Líneas de hora */}
-                      {HOUR_LINES.map(h => (
-                        <View key={h} style={{ position: 'absolute', top: (h - START_HOUR) * 60 * PX_PER_MIN, left: 0, right: 0, height: 1, backgroundColor: h % 1 === 0 ? '#e8eef4' : '#f4f6f8' }} />
-                      ))}
-
-                      {/* Bloque de media hora */}
-                      {HOUR_LINES.map(h => (
-                        <View key={`h-${h}`} style={{ position: 'absolute', top: (h - START_HOUR) * 60 * PX_PER_MIN + 30 * PX_PER_MIN, left: 0, right: 0, height: 1, backgroundColor: '#f0f4f8', borderStyle: 'dashed' }} />
-                      ))}
-
+                    <View key={t.id} style={{ width: COL_WIDTH, height: GRID_HEIGHT, position: 'relative', borderRightWidth: 1, borderRightColor: '#dadce0' }}>
                       {/* Citas posicionadas */}
                       {teamApps.map(item => {
                         const top = timeToTop(item.time);
                         const dur = parseInt(item.duration || '60');
-                        const height = Math.max(dur * PX_PER_MIN, 30);
+                        const height = Math.max(dur * PX_PER_MIN, 20); // Min height to show something
                         const colors = STATUS_COLORS[item.status || 'pending'];
                         return (
                           <TouchableOpacity
@@ -1040,26 +1059,29 @@ export default function CalendarScreen({ route, navigation }: any) {
                             onPress={() => setSelectedAppointment(item)}
                             style={{
                               position: 'absolute',
-                              top,
-                              left: 3,
-                              right: 3,
-                              height,
+                              top: top + 1,
+                              left: 2,
+                              right: 2,
+                              height: height - 2,
                               backgroundColor: colors.bg,
-                              borderRadius: 6,
-                              borderLeftWidth: 3,
+                              borderRadius: 4,
+                              borderLeftWidth: 4,
                               borderLeftColor: colors.border,
-                              borderWidth: 1,
-                              borderColor: colors.border + '55',
                               paddingHorizontal: 6,
-                              paddingVertical: 4,
+                              paddingVertical: height < 30 ? 2 : 4,
                               overflow: 'hidden',
-                              elevation: 2,
+                              shadowColor: '#000',
+                              shadowOpacity: 0.1,
+                              shadowRadius: 2,
+                              elevation: 1,
                             }}
                           >
-                            <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.text }} numberOfLines={1}>{item.time} · {item.serviceName}</Text>
-                            {height > 35 && <Text style={{ fontSize: 10, color: colors.text, opacity: 0.75, marginTop: 1 }} numberOfLines={1}>👤 {item.client}</Text>}
-                            {height > 55 && item.address && <Text style={{ fontSize: 10, color: colors.text, opacity: 0.6, marginTop: 1 }} numberOfLines={1}>📍 {item.address}</Text>}
-                            {conflicts[item.id] && <Text style={{ fontSize: 10, color: '#d9534f' }}>⚠️</Text>}
+                            <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.text }} numberOfLines={1}>
+                              {item.time} · {item.serviceName}
+                            </Text>
+                            {height > 35 && <Text style={{ fontSize: 10, color: colors.text, opacity: 0.8, marginTop: 1 }} numberOfLines={1}>{item.client}</Text>}
+                            {height > 55 && item.address && <Text style={{ fontSize: 9, color: colors.text, opacity: 0.6, marginTop: 1 }} numberOfLines={1}>📍 {item.address}</Text>}
+                            {conflicts[item.id] && <Text style={{ fontSize: 10, color: '#d9534f', position: 'absolute', right: 4, top: 4 }}>⚠️</Text>}
                           </TouchableOpacity>
                         );
                       })}
